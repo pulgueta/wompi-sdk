@@ -1,0 +1,26 @@
+name: Setup
+description: Setup the environment for the project
+
+runs:
+  using: composite
+
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9.7.0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: "pnpm"
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install
+
+    - name: Setup Turborepo cache
+      uses: dtinth/setup-github-actions-caching-for-turbo@v1.3.0
+      with:
+        cache-prefix: wompi_sdk_

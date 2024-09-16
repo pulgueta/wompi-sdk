@@ -2,8 +2,6 @@ name: Format and lint
 
 on:
   pull_request:
-    branches:
-      - main
   workflow_call:
     inputs:
       GH_TOKEN:
@@ -21,19 +19,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.7.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install
+      - name: Setup
+        uses: ./.github/setup
 
       - name: Run lint
         run: pnpm lint
