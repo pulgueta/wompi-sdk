@@ -3,22 +3,24 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
-    "lint": "turbo lint",
+    "lint": "biome lint --write .",
+    "format": "biome format --write .",
     "clean": "turbo clean && rm -rf node_modules",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "changeset": "changeset",
-    "version-packages": "changeset version",
-    "release": "turbo build --filter=@acme/docs && changeset publish"
+    "release": "turbo build --filter=docs && cd packages/core && pnpm release",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.27.1",
-    "eslint": "^8.57.0",
-    "prettier": "^3.2.5",
+    "@biomejs/biome": "^1.9.1",
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@commitlint/types": "^19.5.0",
+    "conventional-changelog-atom": "^5.0.0",
+    "husky": "^9.1.6",
     "turbo": "^2.1.2"
   },
-  "packageManager": "pnpm@8.15.6",
+  "packageManager": "pnpm@9.7.0",
   "engines": {
     "node": ">=18"
   },
-  "name": "with-changesets"
+  "name": "root"
 }
