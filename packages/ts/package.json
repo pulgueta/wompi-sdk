@@ -1,6 +1,7 @@
 {
   "name": "@pulgueta/wompi-tsconfig",
   "description": "INTERNAL: tsconfig.json base configurations",
+  "version": "0.0.0",
   "private": true,
   "types": "./reset.d.ts",
   "files": [
