@@ -5,11 +5,6 @@ runs:
   using: composite
 
   steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
     - name: Install pnpm
       uses: pnpm/action-setup@v4
       with:
@@ -24,8 +19,3 @@ runs:
     - name: Install dependencies
       shell: bash
       run: pnpm install
-
-    - name: Setup Turborepo cache
-      uses: dtinth/setup-github-actions-caching-for-turbo@v1.3.0
-      with:
-        cache-prefix: wompi_sdk_
