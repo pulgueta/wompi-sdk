@@ -4,7 +4,10 @@
   "description": "El SDK de Wompi para Node.js",
   "author": "Andrés Rodríguez <roariasaf@gmail.com>",
   "license": "MIT",
-  "private": true,
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/pulgueta/wompi-sdk"
