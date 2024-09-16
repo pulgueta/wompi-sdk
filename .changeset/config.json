@@ -12,8 +12,5 @@
   "access": "restricted",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": [
-    "@pulgueta/wompi-tsconfig",
-    "client"
-  ]
+  "ignore": []
 }
