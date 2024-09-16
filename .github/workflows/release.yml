@@ -8,37 +8,43 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
+  commitlint:
+    name: Check commit conventions
+    uses: ./.github/workflows/commitlint.yaml
+
+  format:
+    name: Format and lint
+    uses: ./.github/workflows/format.yaml
+
   release:
+    needs: [commitlint, format]
     name: Release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repo
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup pnpm 8
-        uses: pnpm/action-setup@v3
         with:
-          version: 8
+          fetch-depth: 0
 
-      - name: Setup Node.js 20.x
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 20
+          cache: "pnpm"
 
-      - name: Install Dependencies
-        run: pnpm i
+      - name: Install dependencies
+        run: pnpm install
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
-          # This expects you to have a script called release which does a build for your packages and calls changeset publish
           publish: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Send a Slack notification if a publish happens
-        if: steps.changesets.outputs.published == 'true'
-        # You can do something when a publish happens.
-        run: my-slack-bot send-notification --message "A new version of ${GITHUB_REPOSITORY} was published!"

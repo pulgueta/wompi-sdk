@@ -1,0 +1,43 @@
+{
+	"name": "@pulgueta/wompi-node-sdk",
+	"version": "0.0.0",
+	"description": "",
+	"author": "Andrés Rodríguez <roariasaf@gmail.com>",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/pulgueta/wompi-sdk"
+	},
+	"bugs": {
+		"url": "https://github.com/pulgueta/wompi-sdk/issues"
+	},
+	"homepage": "https://github.com/pulgueta/wompi-sdk",
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsup",
+		"lint": "biome format --write .",
+		"format": "biome lint --write --unsafe ."
+	},
+	"keywords": [
+		"wompi",
+		"sdk",
+		"wompi-sdk",
+		"wompi-node-sdk",
+		"bancolombia",
+		"pagos",
+		"pagos-bancolombia"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.1",
+		"@pulgueta/wompi-biome-config": "workspace:*",
+		"@pulgueta/wompi-tsconfig": "workspace:*",
+		"tsup": "^8.2.4",
+		"typescript": "^5.6.2"
+	}
+}

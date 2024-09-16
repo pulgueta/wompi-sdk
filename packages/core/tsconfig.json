@@ -1,0 +1,8 @@
+{
+	"extends": ["@pulgueta/wompi-tsconfig/base.json"],
+	"compilerOptions": {
+		"rootDir": "src",
+		"moduleResolution": "Bundler"
+	},
+	"files": ["src/**/*.ts"]
+}
