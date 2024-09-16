@@ -62,12 +62,6 @@ importers:
 
   packages/core:
     devDependencies:
-      '@changesets/changelog-github':
-        specifier: ^0.5.0
-        version: 0.5.0
-      '@changesets/cli':
-        specifier: ^2.27.8
-        version: 2.27.8
       '@pulgueta/wompi-tsconfig':
         specifier: workspace:*
         version: link:../ts

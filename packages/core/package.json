@@ -34,9 +34,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "changeset": "changeset",
-    "version-packages": "changeset version",
-    "release": "changeset publish"
+    "release": "pnpm publish --no-git-check"
   },
   "keywords": [
     "wompi",
@@ -48,8 +46,6 @@
     "pagos-bancolombia"
   ],
   "devDependencies": {
-    "@changesets/changelog-github": "^0.5.0",
-    "@changesets/cli": "^2.27.8",
     "@pulgueta/wompi-tsconfig": "workspace:*",
     "tsup": "^8.2.4",
     "typescript": "^5.6.2"
