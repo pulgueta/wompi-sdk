@@ -1,25 +1,21 @@
 {
-    "$schema": "https://json.schemastore.org/tsconfig",
-    "compilerOptions": {
-        "allowJs": false,
-        "alwaysStrict": true,
-        "esModuleInterop": true,
-        "allowImportingTsExtensions": false,
-        "rootDir": "src",
-        "outDir": "dist",
-        "strict": true,
-        "declaration": true,
-        "verbatimModuleSyntax": true,
-        "target": "ESNext",
-        "module": "ESNext",
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "noPropertyAccessFromIndexSignature": true,
-        "skipLibCheck": false,
-        "moduleDetection": "force",
-    },
-    "exclude": [
-        "node_modules",
-        "dist"
-    ],
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "allowJs": false,
+    "alwaysStrict": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": false,
+    "strict": true,
+    "declaration": true,
+    "verbatimModuleSyntax": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "skipLibCheck": false,
+    "moduleDetection": "force",
+    "moduleResolution": "Bundler"
+  },
+  "exclude": ["node_modules", "dist"]
 }

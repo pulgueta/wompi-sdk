@@ -9,7 +9,17 @@ const config: UserConfig = {
     "type-enum": [
       RuleConfigSeverity.Error,
       "always",
-      ["build", "chore", "ci", "docs", "feat", "fix", "refactor", "test", "create-turbo"],
+      [
+        "build",
+        "chore",
+        "ci",
+        "docs",
+        "feat",
+        "fix",
+        "refactor",
+        "test",
+        "create-turbo",
+      ],
     ],
     "body-max-length": [RuleConfigSeverity.Error, "always", 120],
   },

@@ -1,9 +1,0 @@
-{
-  "name": "@pulgueta/wompi-biome-config",
-  "description": "INTERNAL: Biome base configuration",
-  "type": "module",
-  "exports": {
-    "./main": "./main.json",
-    "./typescript": "./typescript.json"
-  }
-}

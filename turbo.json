@@ -3,38 +3,17 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "inputs": [
-        "$TURBO_DEFAULT",
-        ".env*"
-      ],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**"
-      ],
-      "dependsOn": [
-        "^build"
-      ]
+      "inputs": ["$TURBO_DEFAULT", ".env*"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "dependsOn": ["^build"]
     },
     "test": {
-      "outputs": [
-        "coverage/**"
-      ],
+      "outputs": ["coverage/**"],
       "dependsOn": []
     },
-    "lint": {},
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "format": {
-      "inputs": [
-        "$TURBO_DEFAULT"
-      ],
-      "outputs": [],
-      "dependsOn": [
-        "^format"
-      ]
     },
     "clean": {
       "cache": false

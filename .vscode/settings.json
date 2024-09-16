@@ -10,5 +10,5 @@
   },
   "editor.codeActionsOnSave": {
     "quickfix.biome": "explicit"
-  },
+  }
 }

@@ -1,4 +1,5 @@
 {
   "name": "@pulgueta/wompi-tsconfig",
-  "description": "INTERNAL: tsconfig.json base configurations"
+  "description": "INTERNAL: tsconfig.json base configurations",
+  "files": ["base.json"]
 }
