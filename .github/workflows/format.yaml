@@ -1,4 +1,3 @@
-
 name: Format and lint
 
 on:
@@ -12,7 +11,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-format-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
