@@ -26,6 +26,9 @@ importers:
       '@commitlint/types':
         specifier: ^19.5.0
         version: 19.5.0
+      '@pulgueta/wompi-tsconfig':
+        specifier: workspace:*
+        version: link:packages/ts
       conventional-changelog-atom:
         specifier: ^5.0.0
         version: 5.0.0
