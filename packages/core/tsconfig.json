@@ -4,7 +4,8 @@
     "types": [
       "../ts/reset.d.ts"
     ],
-    "rootDir": "src",
+    "baseUrl": ".",
+    "rootDir": ".",
     "outDir": "dist",
     "paths": {
       "@/*": [
@@ -13,8 +14,8 @@
     }
   },
   "include": [
-    "src/**/*",
+    "src",
     "./package.json",
-    "./tsup.config.ts"
+    "tsup.config.ts"
   ]
 }

@@ -7,8 +7,7 @@
   "private": false,
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/",
-    "directory": "dist"
+    "registry": "https://registry.npmjs.org/"
   },
   "repository": {
     "type": "git",
@@ -27,7 +26,7 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./package.json": "./package.json",
+    "./package.json": "./dist/package.json",
     ".": {
       "import": "./dist/index.mjs",
       "require": "./dist/index.js",
@@ -49,6 +48,7 @@
   ],
   "devDependencies": {
     "@pulgueta/wompi-tsconfig": "workspace:*",
+    "@types/node": "^22.5.5",
     "tsup": "^8.2.4",
     "typescript": "^5.6.2"
   }

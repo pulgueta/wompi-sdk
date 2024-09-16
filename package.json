@@ -10,7 +10,7 @@
     "clean": "turbo clean && rm -rf node_modules",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "turbo build --filter=docs && changeset publish",
+    "release": "turbo build && changeset version && changeset publish",
     "prepare": "husky"
   },
   "devDependencies": {

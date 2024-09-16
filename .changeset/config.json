@@ -7,7 +7,11 @@
     }
   ],
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@pulgueta/*"
+    ]
+  ],
   "linked": [],
   "access": "restricted",
   "baseBranch": "main",
