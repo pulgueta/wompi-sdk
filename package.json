@@ -8,10 +8,16 @@
     "clean": "turbo clean && rm -rf node_modules",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo build --filter=@acme/docs && changeset publish"
+    "release": "turbo build --filter=@acme/docs && changeset publish",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.8",
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@commitlint/types": "^19.5.0",
+    "conventional-changelog-atom": "^5.0.0",
+    "husky": "^9.1.6",
     "turbo": "^2.1.2"
   },
   "packageManager": "pnpm@9.7.0",
