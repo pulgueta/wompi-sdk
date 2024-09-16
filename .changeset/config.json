@@ -13,9 +13,7 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/coverage/**",
-    "@pulgueta/wompi-tsconfig"
+    "@pulgueta/wompi-tsconfig",
+    "client"
   ]
 }
