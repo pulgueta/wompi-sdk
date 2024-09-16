@@ -1,0 +1,19 @@
+{
+  "extends": "@pulgueta/wompi-tsconfig/bundler.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": [],
+    "paths": {
+      "@pulgueta/wompi": [
+        "packages/core/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "./package.json",
+    "./tsup.config.ts"
+  ],
+  "exclude": [
+    "**/node_modules/**"
+  ]
+}

@@ -1,11 +1,20 @@
 {
-  "extends": ["@pulgueta/wompi-tsconfig/base.json"],
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "types": [
+      "../ts/reset.d.ts"
+    ],
     "rootDir": "src",
     "outDir": "dist",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src/**/*",
+    "./package.json",
+    "./tsup.config.ts"
+  ]
 }

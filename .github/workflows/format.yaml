@@ -16,10 +16,7 @@ jobs:
   code-quality:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup
+      - name: Setup environment
         uses: ./.github/setup
 
       - name: Run lint

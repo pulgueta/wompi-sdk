@@ -1,21 +1,36 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Base",
   "compilerOptions": {
-    "allowJs": false,
-    "alwaysStrict": true,
     "esModuleInterop": true,
-    "allowImportingTsExtensions": false,
-    "strict": true,
-    "declaration": true,
+    "skipLibCheck": true,
+    "target": "ES2020",
     "verbatimModuleSyntax": true,
-    "target": "ESNext",
-    "module": "ESNext",
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "skipLibCheck": false,
+    "allowJs": true,
+    "resolveJsonModule": true,
     "moduleDetection": "force",
-    "moduleResolution": "Bundler"
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+    "outDir": "dist",
+    "sourceMap": true,
+    "strictNullChecks": true,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "noErrorTruncation": true,
+    "baseUrl": ".",
+    "types": [
+      "vitest/globals"
+    ]
   },
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "**/node_modules",
+    "**/types/**"
+  ]
 }
