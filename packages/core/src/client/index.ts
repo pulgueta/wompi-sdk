@@ -3,6 +3,7 @@ import { WompiError } from "@/errors/wompi-error";
 
 import { Merchants } from "@/client/merchants";
 import { Transactions } from "@/client/transactions";
+import { PSE } from "@/client/pse";
 
 type WompiRequestOptions = {
   publicKey: string;
@@ -17,6 +18,7 @@ export class WompiClient extends WompiRequest {
 
   private readonly merchants: Merchants;
   readonly transactions: Transactions;
+  readonly pse: PSE;
 
   constructor(private options: WompiRequestOptions) {
     super();
@@ -30,7 +32,8 @@ export class WompiClient extends WompiRequest {
     this.eventsUrl = options.eventsUrl;
 
     this.merchants = new Merchants(this);
-    this.transactions = new Transactions(this);
+    this.transactions = new Transactions(this, `Bearer ${this.publicKey}`);
+    this.pse = new PSE(this, `Bearer ${this.publicKey}`);
   }
 
   getClientCredentials() {
@@ -41,11 +44,3 @@ export class WompiClient extends WompiRequest {
     };
   }
 }
-
-const c = new WompiClient({
-  publicKey: "pk_test_123",
-  publicEventsKey: "pk_test_123",
-  eventsUrl: "https://api.wompi.co/v1/events",
-});
-
-c;

@@ -1,19 +1,20 @@
 import { WompiClient } from "@/client";
 import type { TransactionParameters, TransactionResponse } from "./types";
-import { createYYYYMMDD, isValidYYYYMMDD } from "./types";
 import { WompiError } from "@/errors/wompi-error";
+import { createYYYYMMDD, isValidYYYYMMDD } from "@/client/utils/date-format";
 
 export class Transactions extends WompiClient {
-  private readonly headers: RequestInit["headers"] = {
-    Authorization: `Bearer ${this.publicKey}`,
-  };
-
-  constructor(readonly client: WompiClient) {
+  constructor(
+    readonly client: WompiClient,
+    readonly authorizationToken: string
+  ) {
     super(client.getClientCredentials());
   }
 
   async getTransaction(id: string) {
-    const transaction = await this.get<TransactionResponse>(`/transactions/${id}`, this.headers);
+    const transaction = await this.get<TransactionResponse>(`/transactions/${id}`, {
+      Authorization: this.authorizationToken,
+    });
 
     if (!transaction) {
       throw new WompiError(`Transaction with id ${id} not found`);
@@ -53,7 +54,9 @@ export class Transactions extends WompiClient {
 
     const transactions = await this.get<TransactionResponse[]>(
       `/transactions?from_date=${from_date}&page=${page}&page_size=${page_size}&until_date=${until_date}&id=${id}&order=${order}&order_by=${order_by}&payment_method_type=${payment_method_type}&reference=${reference}&status=${status}&customer_email=${customer_email}`,
-      this.headers
+      {
+        Authorization: this.authorizationToken,
+      }
     );
 
     if (!transactions) {
