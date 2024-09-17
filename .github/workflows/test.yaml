@@ -1,0 +1,28 @@
+name: Test
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      GH_TOKEN:
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup environment
+        uses: ./.github/setup
+
+      - name: Run tests
+        run: pnpm test
