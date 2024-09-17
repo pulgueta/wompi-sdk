@@ -6,6 +6,7 @@ export default defineConfig({
       clean: true,
       provider: "v8",
       cleanOnRerun: true,
+      reporter: ["json", "json-summary", "text"],
     },
     globals: true,
   },

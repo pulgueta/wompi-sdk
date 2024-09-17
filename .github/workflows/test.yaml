@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  code-quality:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -26,3 +26,13 @@ jobs:
 
       - name: Run tests
         run: pnpm test
+
+      - name: Run test coverage
+        run: pnpm test:cov
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          path: packages/core/coverage
+          retention-days: 7
+          name: coverage-${{ github.sha }}

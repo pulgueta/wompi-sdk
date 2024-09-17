@@ -8,6 +8,7 @@
     "lint": "biome lint --write .",
     "format": "biome format --write .",
     "test": "turbo test",
+    "test:cov": "turbo test:cov",
     "clean": "turbo clean && rm -rf node_modules",
     "changeset": "changeset",
     "version": "changeset version",
@@ -27,11 +28,7 @@
     "turbo": "^2.1.2"
   },
   "workspaces": {
-    "packages": [
-      "packages/*",
-      "packages/core/*",
-      "packages/ts/*"
-    ]
+    "packages": ["packages/*", "packages/core/*", "packages/ts/*"]
   },
   "packageManager": "pnpm@9.7.0",
   "engines": {
