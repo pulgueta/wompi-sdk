@@ -1,6 +1,3 @@
-import type { PaymentProcessor } from "@/types/payment-method-type";
-import type { TransactionStatus } from "@/types/status";
-
 export type TransactionResponse = {
   readonly data: Data;
   readonly meta: Meta;
@@ -84,6 +81,17 @@ export type ShippingAddress = {
 export type Meta = object;
 
 export type YYYYMMDD = `${number}${number}${number}${number}-${number}${number}-${number}${number}`;
+
+export type PaymentProcessor =
+  | "CARD"
+  | "NEQUI"
+  | "PSE"
+  | "BANCOLOMBIA"
+  | "BANCOLOMBIA_TRANSFER"
+  | "BANCOLOMBIA_COLLECT"
+  | "BANCOLOMBIA_QR";
+
+export type TransactionStatus = "APPROVED" | "DECLINED" | "PENDING" | "ERROR" | "VOIDED";
 
 export type TransactionParameters = {
   readonly reference: string;

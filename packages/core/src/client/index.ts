@@ -1,6 +1,4 @@
-import { WompiRequest } from "@/index";
 import { WompiError } from "@/errors/wompi-error";
-
 import { Merchants } from "@/client/merchants";
 import { Transactions } from "@/client/transactions";
 import { PSE } from "@/client/pse";
@@ -11,7 +9,7 @@ type WompiRequestOptions = {
   eventsUrl: string;
 };
 
-export class WompiClient extends WompiRequest {
+export class WompiClient {
   protected readonly publicKey: string;
   protected readonly publicEventsKey: string;
   protected readonly eventsUrl: string;
@@ -21,8 +19,6 @@ export class WompiClient extends WompiRequest {
   readonly pse: PSE;
 
   constructor(private options: WompiRequestOptions) {
-    super();
-
     if (!options) {
       throw new WompiError("Please provide the required credentials");
     }
@@ -31,7 +27,7 @@ export class WompiClient extends WompiRequest {
     this.publicEventsKey = options.publicEventsKey;
     this.eventsUrl = options.eventsUrl;
 
-    this.merchants = new Merchants(this);
+    this.merchants = new Merchants(this, this.publicKey);
     this.transactions = new Transactions(this, `Bearer ${this.publicKey}`);
     this.pse = new PSE(this, `Bearer ${this.publicKey}`);
   }

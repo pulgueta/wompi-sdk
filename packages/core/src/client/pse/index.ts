@@ -1,13 +1,18 @@
+import { WompiRequest } from "@/index";
 import { WompiClient } from "@/client";
 import { WompiError } from "@/errors/wompi-error";
 import type { FinantialInstitutions } from "./types";
 
-export class PSE extends WompiClient {
+export class PSE extends WompiRequest {
+  private readonly client: WompiClient;
+
   constructor(
-    readonly client: WompiClient,
-    readonly authorizationToken: string
+    private readonly wompiClient: WompiClient,
+    private readonly authorizationToken: string
   ) {
-    super(client.getClientCredentials());
+    super();
+
+    this.client = wompiClient;
   }
 
   async getFinantialInstitutions() {
