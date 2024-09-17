@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "types": [
-      "../ts/reset.d.ts"
+      "../ts/reset.d.ts",
+      "node"
+    ],
+    "lib": [
+      "ES2022"
     ],
     "baseUrl": ".",
     "rootDir": ".",
