@@ -14,6 +14,9 @@ concurrency:
 
 jobs:
   test:
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -35,7 +38,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ github.event.number }}
-          vite-config-path: ./packages/core/vite.config.ts
+          vite-config-path: ./packages/core/vitest.config.ts
           working-directory: ./packages/core
           json-final-path: ./coverage/coverage-final.json
           json-summary-path: ./coverage/coverage-summary.json
