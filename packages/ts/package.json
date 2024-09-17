@@ -4,11 +4,7 @@
   "version": "0.0.0",
   "private": true,
   "types": "./reset.d.ts",
-  "files": [
-    "base.json",
-    "bundler.json",
-    "reset.d.ts"
-  ],
+  "files": ["base.json", "bundler.json", "reset.d.ts"],
   "devDependencies": {
     "typescript": "^5.6.2"
   }
