@@ -38,7 +38,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ github.event.number }}
-          vite-config-path: ./packages/core/vitest.config.ts
           working-directory: ./packages/core
+          vite-config-path: ./vitest.config.ts
           json-final-path: ./coverage/coverage-final.json
           json-summary-path: ./coverage/coverage-summary.json
