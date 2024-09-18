@@ -94,15 +94,15 @@ export type PaymentProcessor =
 export type TransactionStatus = "APPROVED" | "DECLINED" | "PENDING" | "ERROR" | "VOIDED";
 
 export type TransactionParameters = {
-  readonly reference: string;
+  readonly reference?: string;
   readonly from_date?: YYYYMMDD;
   readonly until_date?: YYYYMMDD;
   readonly page?: number;
   readonly page_size?: number;
-  readonly id: string;
-  readonly payment_method_type: PaymentProcessor;
-  readonly status: TransactionStatus;
-  readonly customer_email: string;
+  readonly id?: string;
+  readonly payment_method_type?: PaymentProcessor;
+  readonly status?: TransactionStatus;
+  readonly customer_email?: string;
   readonly order_by?: string;
   readonly order?: "DESC" | "ASC";
 };
