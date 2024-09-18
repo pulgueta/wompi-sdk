@@ -15,6 +15,9 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
+permissions:
+  contents: write
+
 jobs:
   commitlint:
     name: Check commit conventions

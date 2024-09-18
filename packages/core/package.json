@@ -1,6 +1,6 @@
 {
   "name": "@pulgueta/wompi",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "El SDK de Wompi para Node.js",
   "author": "Andrés Rodríguez <roariasaf@gmail.com>",
   "license": "MIT",
