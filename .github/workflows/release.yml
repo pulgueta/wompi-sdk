@@ -1,6 +1,11 @@
 name: Release
 
 on:
+  workflow_call:
+    inputs:
+      GH_TOKEN:
+        required: false
+        type: string
   push:
     branches:
       - main
