@@ -51,9 +51,11 @@ jobs:
           semantic_version: latest
           extra_plugins: |
             @semantic-release/changelog
-            @semantic-release/exec
+            @semantic-release/commit-analyzer
             @semantic-release/git
+            @semantic-release/github
             @semantic-release/npm
+            @semantic-release/release-notes-generator
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
