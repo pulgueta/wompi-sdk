@@ -3,7 +3,7 @@ import { Merchants } from "@/client/merchants";
 import { Transactions } from "@/client/transactions";
 import { PSE } from "@/client/pse";
 
-type WompiRequestOptions = {
+type WompiClientOptions = {
   publicKey: string;
   publicEventsKey: string;
   eventsUrl: string;
@@ -18,7 +18,7 @@ export class WompiClient {
   readonly transactions: Transactions;
   readonly pse: PSE;
 
-  constructor(private options: WompiRequestOptions) {
+  constructor(private readonly options: WompiClientOptions) {
     if (!options) {
       throw new WompiError("Please provide the required credentials");
     }
@@ -27,16 +27,8 @@ export class WompiClient {
     this.publicEventsKey = options.publicEventsKey;
     this.eventsUrl = options.eventsUrl;
 
-    this.merchants = new Merchants(this, this.publicKey);
-    this.transactions = new Transactions(this, `Bearer ${this.publicKey}`);
-    this.pse = new PSE(this, `Bearer ${this.publicKey}`);
-  }
-
-  getClientCredentials() {
-    return {
-      publicKey: this.publicKey,
-      publicEventsKey: this.publicEventsKey,
-      eventsUrl: this.eventsUrl,
-    };
+    this.merchants = new Merchants(this.publicKey);
+    this.transactions = new Transactions(`Bearer ${this.publicKey}`);
+    this.pse = new PSE(`Bearer ${this.publicKey}`);
   }
 }

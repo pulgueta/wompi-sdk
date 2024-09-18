@@ -28,14 +28,22 @@ export class WompiRequest {
     return req as T;
   }
 
-  protected async post<const T>(endpoint: string) {
-    const req = await this.request("POST", endpoint);
+  protected async post<const T>(
+    endpoint: string,
+    headers?: RequestInit["headers"],
+    body?: unknown
+  ) {
+    const req = await this.request("POST", endpoint, { headers, body: JSON.stringify(body) });
 
     return req as T;
   }
 
-  protected async patch<const T>(endpoint: string) {
-    const req = await this.request("PATCH", endpoint);
+  protected async patch<const T>(
+    endpoint: string,
+    headers?: RequestInit["headers"],
+    body?: unknown
+  ) {
+    const req = await this.request("PATCH", endpoint, { headers, body: JSON.stringify(body) });
 
     return req as T;
   }
