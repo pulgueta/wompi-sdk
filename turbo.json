@@ -8,8 +8,11 @@
       "dependsOn": ["^build"]
     },
     "test": {
+      "dependsOn": ["^test"]
+    },
+    "test:cov": {
       "outputs": ["coverage/**"],
-      "dependsOn": []
+      "dependsOn": ["^test:cov"]
     },
     "dev": {
       "cache": false,

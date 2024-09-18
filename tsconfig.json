@@ -3,15 +3,9 @@
   "compilerOptions": {
     "types": [],
     "paths": {
-      "@pulgueta/wompi": [
-        "packages/core/src/index.ts"
-      ]
+      "@pulgueta/wompi": ["packages/core/src/index.ts"]
     }
   },
-  "include": [
-    "./package.json"
-  ],
-  "exclude": [
-    "**/node_modules/**"
-  ]
+  "include": ["./package.json"],
+  "exclude": ["**/node_modules/**"]
 }

@@ -1,0 +1,44 @@
+name: Test
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      GH_TOKEN:
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup environment
+        uses: ./.github/setup
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Run test coverage
+        run: pnpm test:cov
+
+      - name: Upload coverage
+        uses: davelosert/vitest-coverage-report-action@v2.5.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.number }}
+          working-directory: ./packages/core
+          vite-config-path: ./vitest.config.ts
+          json-final-path: ./coverage/coverage-final.json
+          json-summary-path: ./coverage/coverage-summary.json

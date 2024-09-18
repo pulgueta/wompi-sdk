@@ -1,11 +1,11 @@
 {
-    "$schema": "https://json.schemastore.org/tsconfig",
-    "extends": "./base.json",
-    "display": "Bundler",
-    "compilerOptions": {
-        "module": "ES2020",
-        "moduleResolution": "Bundler",
-        "declaration": false,
-        "declarationMap": false
-    }
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "display": "Bundler",
+  "compilerOptions": {
+    "module": "ES2020",
+    "moduleResolution": "Bundler",
+    "declaration": false,
+    "declarationMap": false
+  }
 }

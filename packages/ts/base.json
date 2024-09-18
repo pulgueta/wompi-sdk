@@ -16,7 +16,6 @@
     "outDir": "dist",
     "sourceMap": true,
     "strictNullChecks": true,
-    "jsx": "react-jsx",
     "declaration": true,
     "declarationMap": true,
     "noEmit": true,
@@ -25,12 +24,7 @@
     "forceConsistentCasingInFileNames": true,
     "noErrorTruncation": true,
     "baseUrl": ".",
-    "types": [
-      "vitest/globals"
-    ]
+    "types": ["vitest/globals"]
   },
-  "exclude": [
-    "**/node_modules",
-    "**/types/**"
-  ]
+  "exclude": ["**/node_modules", "**/types/**"]
 }

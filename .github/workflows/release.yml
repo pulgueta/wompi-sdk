@@ -19,8 +19,12 @@ jobs:
     name: Format and lint
     uses: ./.github/workflows/format.yaml
 
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yaml
+
   release:
-    needs: [commitlint, format]
+    needs: [commitlint, format, test]
     name: Release
     runs-on: ubuntu-latest
     steps:
