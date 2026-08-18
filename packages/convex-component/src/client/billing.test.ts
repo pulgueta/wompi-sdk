@@ -275,6 +275,95 @@ describe("renewal charge idempotency", () => {
     expect(sub?.failedAttempts).toBe(1);
   });
 
+  test("a duplicate-reference rejection whose lookup fails leaves the payment pending", async () => {
+    const t = initConvexTest();
+    const subscription = await dueRenewal(t);
+    const wompi = makeWompi();
+
+    let lookups = 0;
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { method: "GET", path: /\/merchants\//, respond: () => merchant() },
+        {
+          method: "POST",
+          path: /\/transactions$/,
+          respond: () => json(REFERENCE_USED, 422),
+        },
+        {
+          method: "GET",
+          path: /\/transactions\?reference=/,
+          respond: () => {
+            lookups++;
+            return json({ error: { type: "INTERNAL", reason: "try later" } }, 503);
+          },
+        },
+      ]),
+    );
+
+    // Wompi holds a transaction for this reference (it rejected the
+    // duplicate) but cannot list it right now: the row must stay pending so
+    // the sweep reconciles it later, not be finalized as `error`.
+    const summary = await t.action(async (ctx) => await wompi.processBilling(ctx));
+    expect(summary.stillPending).toBe(1);
+    expect(summary.declined).toBe(0);
+    expect(lookups).toBeGreaterThanOrEqual(1);
+
+    const payments = await paymentsOf(t, subscription._id);
+    const renewal = payments.find((p) => p.periodStart);
+    expect(renewal?.status).toBe("pending");
+    const sub = await subscriptionOf(t, subscription._id);
+    expect(sub?.status).toBe("active");
+    expect(sub?.failedAttempts).toBe(0);
+  });
+
+  test("a newer terminal transaction outranks an older pending one for the same reference", async () => {
+    const t = initConvexTest();
+    const subscription = await dueRenewal(t);
+    const wompi = makeWompi();
+
+    let reference = "";
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { method: "GET", path: /\/merchants\//, respond: () => merchant() },
+        {
+          method: "POST",
+          path: /\/transactions$/,
+          respond: (init) => {
+            reference = (JSON.parse(String(init?.body)) as { reference: string }).reference;
+            return json(REFERENCE_USED, 422);
+          },
+        },
+        {
+          method: "GET",
+          path: /\/transactions\?reference=/,
+          respond: () =>
+            json({
+              data: [
+                {
+                  ...transaction("tx_old", "PENDING", reference),
+                  created_at: "2026-08-18T10:00:00.000Z",
+                },
+                {
+                  ...transaction("tx_new", "DECLINED", reference),
+                  created_at: "2026-08-18T10:05:00.000Z",
+                },
+              ],
+            }),
+        },
+      ]),
+    );
+
+    const summary = await t.action(async (ctx) => await wompi.processBilling(ctx));
+    expect(summary.declined).toBe(1);
+
+    const payments = await paymentsOf(t, subscription._id);
+    const renewal = payments.find((p) => p.periodStart);
+    expect(renewal?.status).toBe("declined");
+    expect(renewal?.wompiTransactionId).toBe("tx_new");
+  });
+
   test("the sweep looks a paid checkout up by reference before expiring it", async () => {
     const t = initConvexTest();
     const { customer } = await seed(t);

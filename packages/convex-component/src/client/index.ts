@@ -222,35 +222,26 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Both acceptance tokens Wompi requires on transactions and payment sources. */
 type AcceptanceTokens = {
   acceptanceToken: string;
-  /** Personal-data authorization (habeas data); absent on merchants without it. */
-  personalAuthToken?: string;
+  /** Personal-data authorization (habeas data). */
+  personalAuthToken: string;
 };
 
 const acceptanceTokensFrom = (merchant: Merchant): AcceptanceTokens | null => {
   const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
-  if (!acceptanceToken) return null;
-  return {
-    acceptanceToken,
-    personalAuthToken: merchant.presigned_personal_data_auth?.acceptance_token,
-  };
-};
-
-const TRANSACTION_STATUS_RANK: Record<string, number> = {
-  APPROVED: 0,
-  PENDING: 1,
-  VOIDED: 2,
-  DECLINED: 3,
-  ERROR: 4,
+  const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+  if (!acceptanceToken || !personalAuthToken) return null;
+  return { acceptanceToken, personalAuthToken };
 };
 
 /**
  * The transaction that decides a reference when Wompi holds several for it
- * (payer retries): an approved one wins, then the newest.
+ * (payer retries): an approved one wins, then the newest — so a newer
+ * terminal result (DECLINED, VOIDED, ERROR) beats an older PENDING one.
  */
 const pickTransaction = (transactions: Transaction[]): Transaction =>
   [...transactions].sort(
     (a, b) =>
-      (TRANSACTION_STATUS_RANK[a.status] ?? 9) - (TRANSACTION_STATUS_RANK[b.status] ?? 9) ||
+      Number(b.status === "APPROVED") - Number(a.status === "APPROVED") ||
       (b.created_at ?? "").localeCompare(a.created_at ?? ""),
   )[0];
 
@@ -570,7 +561,7 @@ export class Wompi {
     if (merchantError) throw merchantError;
     const tokens = acceptanceTokensFrom(merchant);
     if (!tokens) {
-      throw new Error("Could not fetch the merchant acceptance token from Wompi");
+      throw new Error("Could not fetch the merchant acceptance tokens from Wompi");
     }
 
     const [sourceError, source] = await this.client.paymentSources.createPaymentSource({
@@ -673,6 +664,20 @@ export class Wompi {
         const [listError, existing] = await this.client.transactions.listTransactions({
           reference: payment.reference,
         });
+        if (listError && "reference" in chargeError.messages) {
+          // Wompi rejected the reference, so a transaction exists for it. If
+          // we cannot list it right now, marking `error` would let the next
+          // attempt charge under a fresh reference. Leave the row pending for
+          // the sweep to reconcile by reference.
+          return {
+            outcome: "unresolved",
+            paymentChanged: false,
+            subscriptionChanged: false,
+            payment,
+            subscription: null,
+            note: listError.message,
+          };
+        }
         if (!listError && existing.length > 0) {
           return await this.applyWompiTransaction(ctx, pickTransaction(existing));
         }
@@ -895,7 +900,7 @@ export class Wompi {
           outcome = await this.applyWompiTransaction(ctx, transaction);
         } else {
           if (!tokens) {
-            summary.errors.push(`${claim.payment.reference}: no acceptance token`);
+            summary.errors.push(`${claim.payment.reference}: no acceptance tokens`);
             continue;
           }
           outcome = await this.chargeClaimedPayment(ctx, {
@@ -1289,6 +1294,11 @@ export class Wompi {
       path?: string;
       /** Payouts events endpoint; only used with `payouts` credentials. */
       payoutsPath?: string;
+      /**
+       * Runs after each verified delivery is applied. Make it idempotent:
+       * a redelivery that overlaps the first delivery, or arrives after a
+       * crash mid-apply, calls it again for the same checksum.
+       */
       onEvent?: (ctx: RunMutationCtx, event: WebhookEvent) => void | Promise<void>;
     },
   ) {
