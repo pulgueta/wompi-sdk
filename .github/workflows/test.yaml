@@ -30,6 +30,23 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      # A tarball packed outside pnpm keeps `workspace:` specifiers, which
+      # makes the published package uninstallable. Pack every publishable
+      # package the same way the release does and inspect the manifest.
+      - name: Check publishable tarballs
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/packs && mkdir -p /tmp/packs
+          for pkg in packages/core packages/convex-component; do
+            pnpm --filter "./$pkg" pack --pack-destination /tmp/packs
+          done
+          for tgz in /tmp/packs/*.tgz; do
+            if tar -xOf "$tgz" package/package.json | grep -q '"workspace:'; then
+              echo "::error::$tgz contains a workspace: dependency"
+              exit 1
+            fi
+          done
+
       - name: Run test coverage
         run: pnpm test:cov
 
