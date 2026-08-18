@@ -87,8 +87,8 @@ export default defineSchema({
     expMonth: v.optional(v.string()),
     expYear: v.optional(v.string()),
     cardHolder: v.optional(v.string()),
-    // When the customer accepted Wompi's terms and personal-data
-    // authorization (both acceptance tokens are sent with the source).
+    // When the customer accepted Wompi's terms (the source was created with
+    // the merchant's presigned acceptance token).
     termsAcceptedAt: v.optional(v.number()),
   })
     .index("by_customer_id", ["customerId"])
@@ -124,6 +124,9 @@ export default defineSchema({
     // Scheduled plan change, applied at the next renewal (no proration).
     pendingProductId: v.optional(v.id("products")),
     pendingProductKey: v.optional(v.string()),
+    // Resume charges minted for this subscription (incomplete/unpaid retries
+    // through `subscriptions.create`); numbers their references.
+    resumeAttempts: v.optional(v.number()),
     metadata: v.optional(v.record(v.string(), v.any())),
   })
     .index("by_user_id", ["userId"])
@@ -161,6 +164,7 @@ export default defineSchema({
     .index("by_reference", ["reference"])
     .index("by_user_id", ["userId"])
     .index("by_subscription_id", ["subscriptionId"])
+    .index("by_subscription_id_status", ["subscriptionId", "status"])
     .index("by_wompi_transaction_id", ["wompiTransactionId"])
     .index("by_status", ["status"]),
 

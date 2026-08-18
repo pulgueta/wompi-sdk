@@ -86,10 +86,12 @@ export const create = mutation({
     );
 
     if (resumable) {
-      const priorPayments = await ctx.db
+      const inFlight = await ctx.db
         .query("payments")
-        .withIndex("by_subscription_id", (q) => q.eq("subscriptionId", resumable._id))
-        .take(200);
+        .withIndex("by_subscription_id_status", (q) =>
+          q.eq("subscriptionId", resumable._id).eq("status", "pending"),
+        )
+        .first();
 
       await ctx.db.patch("subscriptions", resumable._id, {
         paymentSourceId,
@@ -107,7 +109,6 @@ export const create = mutation({
       // reference — Wompi rejects the duplicate and the existing transaction
       // is reconciled instead of charged twice. The row is left untouched:
       // it may already be at Wompi with these very amounts.
-      const inFlight = priorPayments.find((p) => p.status === "pending");
       if (inFlight) {
         return {
           subscription: (await ctx.db.get("subscriptions", resumable._id))!,
@@ -115,11 +116,23 @@ export const create = mutation({
         };
       }
 
-      // Resume references must be deterministic and fresh per settled attempt:
-      // attempts are numbered by settled charge rows, so each declined attempt
-      // gets a new reference while a crashed one is retried under its own.
-      const attempt = priorPayments.length;
-      const reference = subscriptionChargeReference(resumable._id, "resume", attempt);
+      // Resume references must be fresh per settled attempt: a counter on the
+      // subscription numbers them, so each declined attempt gets a new
+      // reference while a crashed one is retried under its own (above).
+      // Subscriptions from before the counter numbered resumes by row count;
+      // skip any reference such a row already holds.
+      let attempt = (resumable.resumeAttempts ?? 0) + 1;
+      let reference = subscriptionChargeReference(resumable._id, "resume", attempt);
+      while (
+        await ctx.db
+          .query("payments")
+          .withIndex("by_reference", (q) => q.eq("reference", reference))
+          .first()
+      ) {
+        attempt += 1;
+        reference = subscriptionChargeReference(resumable._id, "resume", attempt);
+      }
+      await ctx.db.patch("subscriptions", resumable._id, { resumeAttempts: attempt });
 
       const paymentId = await ctx.db.insert("payments", {
         reference,

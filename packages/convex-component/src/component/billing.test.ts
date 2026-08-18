@@ -577,6 +577,65 @@ describe("subscription lifecycle", () => {
     });
     expect(retriedAgain.payment!._id).toBe(retried.payment!._id);
     expect(retriedAgain.payment!.reference).toBe(retried.payment!.reference);
+
+    // The resume charge is declined as well: the next resume mints a new
+    // reference instead of reusing the settled one.
+    await t.mutation(api.billing.recordChargeResult, {
+      paymentId: retried.payment!._id,
+      nextStatus: "declined",
+      failureReason: "Card declined",
+      config: CONFIG,
+    });
+    const third = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: CARD,
+    });
+    expect(third.payment!._id).not.toBe(retried.payment!._id);
+    expect(third.payment!.attempt).toBe(2);
+    expect(third.payment!.reference).toBe(`wmps_${created.subscription._id}_resume_a2`);
+    expect(third.subscription.resumeAttempts).toBe(2);
+  });
+
+  test("resume numbering skips references held by rows from before the counter", async () => {
+    const t = initConvexTest();
+    const { customer } = await seed(t);
+
+    const created = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: CARD,
+    });
+    await t.mutation(api.billing.recordChargeResult, {
+      paymentId: created.payment!._id,
+      nextStatus: "declined",
+      failureReason: "Card declined",
+      config: CONFIG,
+    });
+
+    // A subscription resumed by an earlier release: the row exists, the
+    // counter does not.
+    const legacyReference = `wmps_${created.subscription._id}_resume_a1`;
+    const { _id: _legacyId, _creationTime: _legacyCreated, ...legacyRow } = created.payment!;
+    await t.run(async (ctx) => {
+      await ctx.db.insert("payments", {
+        ...legacyRow,
+        reference: legacyReference,
+        status: "declined",
+        attempt: 1,
+      });
+    });
+
+    const retried = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: CARD,
+    });
+    expect(retried.payment!.reference).toBe(`wmps_${created.subscription._id}_resume_a2`);
+    expect(retried.subscription.resumeAttempts).toBe(2);
   });
 
   test("subscribing twice while the initial charge is in flight reuses the pending payment", async () => {
