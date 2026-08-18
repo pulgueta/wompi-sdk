@@ -42,10 +42,14 @@ type GetConfigRef = FunctionReference<
  */
 export function useWompiTokenizer(getConfig: GetConfigRef) {
   const config = useQuery(getConfig, {});
-  const [acceptancePermalink, setAcceptancePermalink] = useState<string | null>(null);
-  const [personalDataAuthPermalink, setPersonalDataAuthPermalink] = useState<string | null>(
-    null,
-  );
+  // Links are stored with the client that fetched them, so a previous
+  // merchant's links are never shown while the new ones load or after the
+  // request fails.
+  const [links, setLinks] = useState<{
+    client: WompiClient;
+    acceptance: string | null;
+    personalDataAuth: string | null;
+  } | null>(null);
 
   const publicKey = config?.publicKey;
   const sandbox = config?.sandbox ?? false;
@@ -61,18 +65,21 @@ export function useWompiTokenizer(getConfig: GetConfigRef) {
 
     void client.merchants.getMerchant().then(([error, merchant]) => {
       if (!active || error) return;
-      if (merchant.presigned_acceptance) {
-        setAcceptancePermalink(merchant.presigned_acceptance.permalink);
-      }
-      if (merchant.presigned_personal_data_auth) {
-        setPersonalDataAuthPermalink(merchant.presigned_personal_data_auth.permalink);
-      }
+      setLinks({
+        client,
+        acceptance: merchant.presigned_acceptance?.permalink ?? null,
+        personalDataAuth: merchant.presigned_personal_data_auth?.permalink ?? null,
+      });
     });
 
     return () => {
       active = false;
     };
   }, [client]);
+
+  const currentLinks = links !== null && links.client === client ? links : null;
+  const acceptancePermalink = currentLinks?.acceptance ?? null;
+  const personalDataAuthPermalink = currentLinks?.personalDataAuth ?? null;
 
   const tokenizeCard = useCallback(
     async (card: CardInput): Promise<CardToken> => {
