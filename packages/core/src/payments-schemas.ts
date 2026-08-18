@@ -97,7 +97,8 @@ export const TaxSchema = z.union([TaxByAmountSchema, TaxByPercentageSchema]);
  *
  * Wompi requires two acceptance tokens: `acceptance_token` (from
  * `merchant.presigned_acceptance`) and `accept_personal_auth` (from
- * `merchant.presigned_personal_data_auth`).
+ * `merchant.presigned_personal_data_auth`). Both are required here, so a
+ * request without them is rejected locally before anything is sent.
  *
  * The object is `.loose()` so any field Wompi documents but the SDK does not
  * name still reaches the API — stripping it would silently change the request.
@@ -105,7 +106,7 @@ export const TaxSchema = z.union([TaxByAmountSchema, TaxByPercentageSchema]);
 export const CreateTransactionInputSchema = z
   .object({
     acceptance_token: z.string(),
-    accept_personal_auth: z.string().optional(),
+    accept_personal_auth: z.string(),
     amount_in_cents: z.number().int().min(1).max(MAX_AMOUNT_IN_CENTS),
     currency: CurrencySchema,
     signature: z.string(),
@@ -267,7 +268,7 @@ export const CreatePaymentSourceInputSchema = z
     type: PaymentSourceTypeSchema,
     token: z.string(),
     acceptance_token: z.string(),
-    accept_personal_auth: z.string().optional(),
+    accept_personal_auth: z.string(),
     customer_email: z.email(),
     payment_description: z.string().optional(),
   })

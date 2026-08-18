@@ -36,8 +36,9 @@ const wompi = new WompiClient({
 // 1. Get both acceptance tokens
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
-const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
-const personalAuthToken = merchant.presigned_personal_data_auth!.acceptance_token;
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 
 // 2. Tokenize the card
 const [tokenErr, token] = await wompi.tokens.tokenizeCard({
@@ -116,8 +117,9 @@ const signature = await getSignatureKey({
 
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
-const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
-const personalAuthToken = merchant.presigned_personal_data_auth!.acceptance_token;
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 
 const [error, txn] = await wompi.transactions.createTransaction({
   acceptance_token: acceptanceToken,
@@ -163,7 +165,7 @@ Source: `packages/core/src/client/payment-sources/index.ts`
 
 ---
 
-### HIGH Omitting `acceptance_token` when creating a payment source
+### HIGH Omitting the acceptance tokens when creating a payment source
 
 Wrong:
 
@@ -172,7 +174,7 @@ await wompi.paymentSources.createPaymentSource({
   type: 'CARD',
   token: cardToken.id,
   customer_email: 'user@example.com',
-  // acceptance_token missing — Zod validation fails before HTTP call
+  // acceptance_token and accept_personal_auth missing — Zod validation fails before HTTP call
 });
 ```
 
@@ -181,8 +183,9 @@ Correct:
 ```typescript
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
-const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
-const personalAuthToken = merchant.presigned_personal_data_auth!.acceptance_token;
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 
 await wompi.paymentSources.createPaymentSource({
   type: 'CARD',
@@ -193,7 +196,7 @@ await wompi.paymentSources.createPaymentSource({
 });
 ```
 
-`acceptance_token` is required in `createPaymentSource` — same merchant acceptance token used for transactions. Send `accept_personal_auth` (from `presigned_personal_data_auth`) with it. Fetch both fresh before each call.
+Both `acceptance_token` and `accept_personal_auth` are required in `createPaymentSource` — the same merchant tokens used for transactions. Fetch both fresh before each call, show the two permalinks (`presigned_acceptance.permalink`, `presigned_personal_data_auth.permalink`) to the customer, and send the tokens only after they accept.
 
 Source: `packages/core/src/schemas.ts` — `CreatePaymentSourceInputSchema`
 

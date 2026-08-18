@@ -196,7 +196,9 @@ app.post('/pay', async (c) => {
   if (merchantErr) return c.json({ error: merchantErr.message }, 500);
   const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
   const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
-  if (!acceptanceToken) return c.json({ error: 'Could not get acceptance token' }, 500);
+  if (!acceptanceToken || !personalAuthToken) {
+    return c.json({ error: 'Could not get acceptance tokens' }, 500);
+  }
 
   // Tokenize card
   const [tokenErr, token] = await wompi.tokens.tokenizeCard({

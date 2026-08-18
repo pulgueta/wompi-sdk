@@ -40,12 +40,14 @@ const wompi = new WompiClient({
   sandbox: process.env.NODE_ENV !== 'production',
 });
 
-// 1. Fresh acceptance tokens — fetch both for each transaction
+// 1. Fresh acceptance tokens — fetch both for each transaction. Show the two
+//    permalinks (presigned_acceptance.permalink, presigned_personal_data_auth.permalink)
+//    and send the tokens only after the customer accepts.
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
 const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
-if (!acceptanceToken) throw new Error('Missing acceptance token');
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 
 // 2. Tokenize the card
 const [tokenErr, token] = await wompi.tokens.tokenizeCard({
@@ -238,7 +240,7 @@ const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
 const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
-if (!acceptanceToken) throw new Error('Missing acceptance token');
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 ```
 
 Source: `packages/core/src/client/merchants/index.ts`, README

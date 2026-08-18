@@ -160,6 +160,7 @@ describe("Transactions", () => {
       const transactions = makeClient(PRIVATE_KEY);
       const input = {
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         amount_in_cents: 3000000,
         currency: "COP",
         signature: "sig_123",
@@ -185,6 +186,7 @@ describe("Transactions", () => {
 
       const [error] = await transactions.createTransaction({
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         amount_in_cents: 3000000,
         currency: "COP",
         signature: "sig_123",
@@ -203,6 +205,7 @@ describe("Transactions", () => {
 
       const [error, data] = await transactions.createTransaction({
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         amount_in_cents: 3000000,
         currency: "COP",
         signature: "sig_123",
@@ -220,6 +223,7 @@ describe("Transactions", () => {
 
       const [error, data] = await transactions.createTransaction({
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         amount_in_cents: 3000000,
         currency: "COP",
         signature: "sig_123",
@@ -244,6 +248,7 @@ describe("Transactions", () => {
 
       const [error, data] = await transactions.createTransaction({
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         amount_in_cents: 3000000,
         currency: "COP",
         signature: "sig_123",
@@ -262,6 +267,25 @@ describe("Transactions", () => {
         payment_source_id: 1234,
       });
       expect(init.headers.Authorization).toBe(`Bearer ${PRIVATE_KEY}`);
+    });
+
+    it("should reject a missing accept_personal_auth before any request is sent", async () => {
+      const transactions = makeClient(PRIVATE_KEY);
+
+      const [error, data] = await transactions.createTransaction({
+        acceptance_token: "eyJhb...",
+        amount_in_cents: 3000000,
+        currency: "COP",
+        signature: "sig_123",
+        customer_email: "test@example.com",
+        reference: "ref-123",
+        payment_method: { type: "CARD", token: "tok_123", installments: 1 },
+      });
+
+      expect(data).toBeNull();
+      expect(error).toBeInstanceOf(WompiError);
+      expect(error!.message).toContain("accept_personal_auth");
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("should forward the second acceptance token and the optional documented fields", async () => {
@@ -304,6 +328,7 @@ describe("Transactions", () => {
 
       const [error] = await transactions.createTransaction({
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         amount_in_cents: 3000000,
         currency: "COP",
         signature: "sig_123",

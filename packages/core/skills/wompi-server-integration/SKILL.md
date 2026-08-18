@@ -47,8 +47,11 @@ app.post('/checkout', zValidator('json', TokenizeCardInputSchema), async (c) => 
   // 1. Acceptance tokens
   const [merchantErr, merchant] = await wompi.merchants.getMerchant();
   if (merchantErr) return c.json({ error: merchantErr.message }, 500);
-  const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
-  const personalAuthToken = merchant.presigned_personal_data_auth!.acceptance_token;
+  const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+  const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+  if (!acceptanceToken || !personalAuthToken) {
+    return c.json({ error: 'Merchant has no acceptance tokens' }, 500);
+  }
 
   // 2. Tokenize
   const [tokenErr, token] = await wompi.tokens.tokenizeCard(cardInput);
@@ -105,8 +108,11 @@ new Elysia()
   .post('/checkout', async ({ body, error }) => {
     const [merchantErr, merchant] = await wompi.merchants.getMerchant();
     if (merchantErr) return error(500, merchantErr.message);
-    const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
-    const personalAuthToken = merchant.presigned_personal_data_auth!.acceptance_token;
+    const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+    const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+    if (!acceptanceToken || !personalAuthToken) {
+      return error(500, 'Merchant has no acceptance tokens');
+    }
 
     const [tokenErr, token] = await wompi.tokens.tokenizeCard(body);
     if (tokenErr) return error(422, tokenErr.message);
