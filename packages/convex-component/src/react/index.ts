@@ -34,7 +34,7 @@ type GetConfigRef = FunctionReference<
  * `subscribe` action.
  *
  * ```tsx
- * const { tokenizeCard, acceptancePermalink, ready } =
+ * const { tokenizeCard, acceptancePermalink, personalDataAuthPermalink, ready } =
  *   useWompiTokenizer(api.wompi.getConfig);
  * const token = await tokenizeCard(card);
  * await subscribe({ productKey, token: token.id, paymentMethod: { ... } });
@@ -43,6 +43,9 @@ type GetConfigRef = FunctionReference<
 export function useWompiTokenizer(getConfig: GetConfigRef) {
   const config = useQuery(getConfig, {});
   const [acceptancePermalink, setAcceptancePermalink] = useState<string | null>(null);
+  const [personalDataAuthPermalink, setPersonalDataAuthPermalink] = useState<string | null>(
+    null,
+  );
 
   const publicKey = config?.publicKey;
   const sandbox = config?.sandbox ?? false;
@@ -57,8 +60,12 @@ export function useWompiTokenizer(getConfig: GetConfigRef) {
     let active = true;
 
     void client.merchants.getMerchant().then(([error, merchant]) => {
-      if (active && !error && merchant.presigned_acceptance) {
+      if (!active || error) return;
+      if (merchant.presigned_acceptance) {
         setAcceptancePermalink(merchant.presigned_acceptance.permalink);
+      }
+      if (merchant.presigned_personal_data_auth) {
+        setPersonalDataAuthPermalink(merchant.presigned_personal_data_auth.permalink);
       }
     });
 
@@ -93,6 +100,11 @@ export function useWompiTokenizer(getConfig: GetConfigRef) {
     config: config ?? null,
     /** Link to Wompi's terms the user accepts when saving a payment method. */
     acceptancePermalink,
+    /**
+     * Link to Wompi's personal-data authorization (habeas data). Show both
+     * links: `subscribe` sends both acceptance tokens on the user's behalf.
+     */
+    personalDataAuthPermalink,
     tokenizeCard,
   };
 }

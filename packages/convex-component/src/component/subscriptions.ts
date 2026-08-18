@@ -78,6 +78,7 @@ export const create = mutation({
       customerId: args.customerId,
       userId: args.userId,
       ...args.paymentSource,
+      termsAcceptedAt: now,
     });
 
     const resumable = sameProduct.find(
@@ -85,17 +86,10 @@ export const create = mutation({
     );
 
     if (resumable) {
-      // Resume references must be deterministic — a retried call (action
-      // retry, double submit) has to land on the same pending charge instead
-      // of minting a second one. Attempts are numbered by settled charge
-      // rows: inserting the pending row doesn't move the counter, settling
-      // it does, so each declined attempt gets a fresh reference.
       const priorPayments = await ctx.db
         .query("payments")
         .withIndex("by_subscription_id", (q) => q.eq("subscriptionId", resumable._id))
         .take(200);
-      const attempt = priorPayments.filter((p) => p.status !== "pending").length;
-      const reference = subscriptionChargeReference(resumable._id, "resume", attempt);
 
       await ctx.db.patch("subscriptions", resumable._id, {
         paymentSourceId,
@@ -107,35 +101,40 @@ export const create = mutation({
         lastError: undefined,
       });
 
-      const reusable = priorPayments.find(
-        (p) => p.reference === reference && p.status === "pending",
-      );
-
-      let paymentId;
-      if (reusable) {
-        await ctx.db.patch("payments", reusable._id, {
-          amountInCents: product.amountInCents,
-          currency: product.currency,
-          description: product.name,
-          attempt,
-        });
-        paymentId = reusable._id;
-      } else {
-        paymentId = await ctx.db.insert("payments", {
-          reference,
-          kind: "subscription",
-          status: "pending",
-          customerId: args.customerId,
-          userId: args.userId,
-          productId: product._id,
-          productKey: product.key,
-          subscriptionId: resumable._id,
-          amountInCents: product.amountInCents,
-          currency: product.currency,
-          description: product.name,
-          attempt,
-        });
+      // Never mint a second charge while one is in flight. A retried call
+      // (action retry, double submit, a previous attempt that never settled)
+      // gets the same pending row back, so the caller lands on the same Wompi
+      // reference — Wompi rejects the duplicate and the existing transaction
+      // is reconciled instead of charged twice. The row is left untouched:
+      // it may already be at Wompi with these very amounts.
+      const inFlight = priorPayments.find((p) => p.status === "pending");
+      if (inFlight) {
+        return {
+          subscription: (await ctx.db.get("subscriptions", resumable._id))!,
+          payment: inFlight,
+        };
       }
+
+      // Resume references must be deterministic and fresh per settled attempt:
+      // attempts are numbered by settled charge rows, so each declined attempt
+      // gets a new reference while a crashed one is retried under its own.
+      const attempt = priorPayments.length;
+      const reference = subscriptionChargeReference(resumable._id, "resume", attempt);
+
+      const paymentId = await ctx.db.insert("payments", {
+        reference,
+        kind: "subscription",
+        status: "pending",
+        customerId: args.customerId,
+        userId: args.userId,
+        productId: product._id,
+        productKey: product.key,
+        subscriptionId: resumable._id,
+        amountInCents: product.amountInCents,
+        currency: product.currency,
+        description: product.name,
+        attempt,
+      });
 
       return {
         subscription: (await ctx.db.get("subscriptions", resumable._id))!,

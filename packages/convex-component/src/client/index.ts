@@ -33,13 +33,20 @@ import type {
   BrebKeyType,
   CreatePayoutInput,
   CreatePayoutResult,
+  Merchant,
   Payout,
   PayoutPage,
   Result,
   Transaction,
   WebhookEvent,
+  WompiErrorResult,
 } from "@pulgueta/wompi/schemas";
-import { WompiPayoutApiError, WompiValidationError } from "@pulgueta/wompi/schemas";
+import {
+  WompiNotFoundError,
+  WompiPayoutApiError,
+  WompiRequestError,
+  WompiValidationError,
+} from "@pulgueta/wompi/schemas";
 import type { ComponentApi } from "../component/_generated/component.js";
 import {
   dispersionDoc,
@@ -211,6 +218,61 @@ export type ProcessBillingSummary = {
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Both acceptance tokens Wompi requires on transactions and payment sources. */
+type AcceptanceTokens = {
+  acceptanceToken: string;
+  /** Personal-data authorization (habeas data); absent on merchants without it. */
+  personalAuthToken?: string;
+};
+
+const acceptanceTokensFrom = (merchant: Merchant): AcceptanceTokens | null => {
+  const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+  if (!acceptanceToken) return null;
+  return {
+    acceptanceToken,
+    personalAuthToken: merchant.presigned_personal_data_auth?.acceptance_token,
+  };
+};
+
+const TRANSACTION_STATUS_RANK: Record<string, number> = {
+  APPROVED: 0,
+  PENDING: 1,
+  VOIDED: 2,
+  DECLINED: 3,
+  ERROR: 4,
+};
+
+/**
+ * The transaction that decides a reference when Wompi holds several for it
+ * (payer retries): an approved one wins, then the newest.
+ */
+const pickTransaction = (transactions: Transaction[]): Transaction =>
+  [...transactions].sort(
+    (a, b) =>
+      (TRANSACTION_STATUS_RANK[a.status] ?? 9) - (TRANSACTION_STATUS_RANK[b.status] ?? 9) ||
+      (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+  )[0];
+
+/**
+ * Whether a failed charge request may still have created a transaction at
+ * Wompi. Only a rejected request (validation, not found, other 4xx) proves
+ * nothing was created; timeouts, network failures, 5xx and throttling do
+ * not — and neither does a 2xx whose body failed to parse.
+ */
+const chargeMayHaveReachedWompi = (error: WompiErrorResult): boolean => {
+  if (error instanceof WompiValidationError || error instanceof WompiNotFoundError) return false;
+  if (error instanceof WompiRequestError) {
+    return (
+      error.statusCode === 0 ||
+      error.statusCode >= 500 ||
+      error.statusCode === 408 ||
+      error.statusCode === 429
+    );
+  }
+  // The SDK rejects malformed input before any request is sent.
+  return !error.message.startsWith("Invalid input");
+};
 
 /**
  * App-facing client for the Wompi Convex component.
@@ -506,15 +568,16 @@ export class Wompi {
 
     const [merchantError, merchant] = await this.client.merchants.getMerchant();
     if (merchantError) throw merchantError;
-    const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
-    if (!acceptanceToken) {
+    const tokens = acceptanceTokensFrom(merchant);
+    if (!tokens) {
       throw new Error("Could not fetch the merchant acceptance token from Wompi");
     }
 
     const [sourceError, source] = await this.client.paymentSources.createPaymentSource({
       type: args.type ?? "CARD",
       token: args.token,
-      acceptance_token: acceptanceToken,
+      acceptance_token: tokens.acceptanceToken,
+      accept_personal_auth: tokens.personalAuthToken,
       customer_email: user.email,
     });
     if (sourceError) throw sourceError;
@@ -551,7 +614,7 @@ export class Wompi {
       payment,
       customerEmail: user.email,
       wompiSourceId: source.id,
-      acceptanceToken,
+      tokens,
       integrityKey,
       pollAttempts: this.billingOptions.pollAttempts,
       installments: args.installments,
@@ -575,7 +638,7 @@ export class Wompi {
       payment: PaymentDoc;
       customerEmail: string;
       wompiSourceId: number;
-      acceptanceToken: string;
+      tokens: AcceptanceTokens;
       integrityKey: string;
       pollAttempts: number;
       installments?: number;
@@ -591,7 +654,8 @@ export class Wompi {
     });
 
     const [chargeError, transaction] = await this.client.transactions.createTransaction({
-      acceptance_token: args.acceptanceToken,
+      acceptance_token: args.tokens.acceptanceToken,
+      accept_personal_auth: args.tokens.personalAuthToken,
       amount_in_cents: payment.amountInCents,
       currency: payment.currency,
       signature,
@@ -610,8 +674,24 @@ export class Wompi {
           reference: payment.reference,
         });
         if (!listError && existing.length > 0) {
-          return await this.applyWompiTransaction(ctx, existing[0]);
+          return await this.applyWompiTransaction(ctx, pickTransaction(existing));
         }
+      }
+
+      if (chargeMayHaveReachedWompi(chargeError)) {
+        // Wompi may hold a transaction we never saw (timeout, 5xx, network).
+        // Recording a terminal `error` now would let the next attempt charge
+        // under a fresh reference — a double charge. Leave the row pending:
+        // the next claim reuses this reference (Wompi rejects the duplicate
+        // and we reconcile), and the sweep reconciles by reference meanwhile.
+        return {
+          outcome: "unresolved",
+          paymentChanged: false,
+          subscriptionChanged: false,
+          payment,
+          subscription: null,
+          note: chargeError.message,
+        };
       }
 
       const outcome = (await ctx.runMutation(this.component.billing.recordChargeResult, {
@@ -788,7 +868,7 @@ export class Wompi {
       });
     }
 
-    let acceptanceToken: string | null = null;
+    let tokens: AcceptanceTokens | null = null;
 
     if (claims.some((c) => c.action === "charge")) {
       this.requireKey(this.privateKey, "private key", "WOMPI_PRIVATE_KEY");
@@ -796,7 +876,7 @@ export class Wompi {
       if (merchantError) {
         summary.errors.push(`merchant: ${merchantError.message}`);
       } else {
-        acceptanceToken = merchant.presigned_acceptance?.acceptance_token ?? null;
+        tokens = acceptanceTokensFrom(merchant);
       }
     }
 
@@ -814,7 +894,7 @@ export class Wompi {
           }
           outcome = await this.applyWompiTransaction(ctx, transaction);
         } else {
-          if (!acceptanceToken) {
+          if (!tokens) {
             summary.errors.push(`${claim.payment.reference}: no acceptance token`);
             continue;
           }
@@ -822,7 +902,7 @@ export class Wompi {
             payment: claim.payment,
             customerEmail: claim.customerEmail,
             wompiSourceId: claim.wompiSourceId,
-            acceptanceToken,
+            tokens,
             integrityKey: this.requireKey(
               this.integrityKey,
               "integrity key",
@@ -834,6 +914,9 @@ export class Wompi {
         }
 
         if (claim.action === "reconcile") summary.reconciled++;
+        if (outcome.outcome === "unresolved") {
+          summary.errors.push(`${claim.payment.reference}: ${outcome.note ?? "charge unresolved"}`);
+        }
         const status = outcome.payment?.status;
         if (status === "approved") summary.approved++;
         else if (status === "declined" || status === "error") summary.declined++;
@@ -869,8 +952,29 @@ export class Wompi {
         const neverCharged =
           payment.kind === "checkout" ||
           (payment.kind === "subscription" && payment.periodStart === undefined);
+        const shouldExpire = neverCharged && age > this.billingOptions.expirePendingAfterMs;
 
-        if (neverCharged && age > this.billingOptions.expirePendingAfterMs) {
+        // No transaction id here does not mean no transaction at Wompi: a
+        // server-side charge may have landed after a timeout, and a checkout
+        // may have been paid without the webhook or redirect reaching us. Ask
+        // Wompi by reference — every sweep for server-side charges, and once
+        // before giving up on a checkout.
+        if (this.privateKey && (payment.kind === "subscription" || shouldExpire)) {
+          const [error, existing] = await this.client.transactions.listTransactions({
+            reference: payment.reference,
+          });
+          if (error) {
+            summary.errors.push(`sweep ${payment.reference}: ${error.message}`);
+            continue;
+          }
+          if (existing.length > 0) {
+            const outcome = await this.applyWompiTransaction(ctx, pickTransaction(existing));
+            if (outcome.paymentChanged) summary.sweptPending++;
+            continue;
+          }
+        }
+
+        if (shouldExpire) {
           const outcome = (await ctx.runMutation(this.component.billing.recordChargeResult, {
             paymentId: payment._id,
             nextStatus: "expired",
@@ -1210,25 +1314,26 @@ export class Wompi {
           ? event.data.transaction
           : undefined;
 
-        const { duplicate, eventId } = (await ctx.runMutation(
-          this.component.webhooks.recordEvent,
-          {
-            checksum: event.signature.checksum,
-            eventType: event.event,
-            environment: event.environment,
-            timestamp: event.timestamp,
-            sentAt: event.sent_at,
-            transactionId: transaction?.id,
-            reference: transaction?.reference,
-          },
-        )) as { duplicate: boolean; eventId: string };
+        const delivery = (await ctx.runMutation(this.component.webhooks.recordEvent, {
+          checksum: event.signature.checksum,
+          eventType: event.event,
+          environment: event.environment,
+          timestamp: event.timestamp,
+          sentAt: event.sent_at,
+          transactionId: transaction?.id,
+          reference: transaction?.reference,
+        })) as { duplicate: boolean; eventId: string; outcome?: string };
 
-        if (duplicate) {
+        // A duplicate with no recorded outcome crashed between recording and
+        // applying on a previous delivery; Wompi's retry must reprocess it,
+        // not be told it was handled.
+        if (delivery.duplicate && delivery.outcome !== undefined) {
           return new Response(JSON.stringify({ received: true, duplicate: true }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
         }
+        const eventId = delivery.eventId;
 
         let outcome = "ignored";
 
@@ -1248,7 +1353,7 @@ export class Wompi {
           console.error("Wompi onEvent callback failed:", callbackError);
         }
 
-        return new Response(JSON.stringify({ received: true }), {
+        return new Response(JSON.stringify({ received: true, duplicate: delivery.duplicate }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
@@ -1433,25 +1538,46 @@ export class Wompi {
         },
       }),
 
+      /**
+       * Client-facing checkout: the amount always comes from the catalog
+       * (`productKey`), never from the browser. Use `wompi.checkout(ctx, …)`
+       * in your own server function for custom amounts or metadata.
+       */
       checkout: actionGeneric({
         args: {
           redirectUrl: v.string(),
-          productKey: v.optional(v.string()),
-          amountInCents: v.optional(v.number()),
-          description: v.optional(v.string()),
-          metadata: v.optional(v.record(v.string(), v.any())),
+          productKey: v.string(),
         },
         returns: v.object({ url: v.string(), reference: v.string() }),
         handler: async (ctx, args) => {
-          const { url, reference } = await this.checkout(ctx, args);
+          const { url, reference } = await this.checkout(ctx, {
+            redirectUrl: args.redirectUrl,
+            productKey: args.productKey,
+          });
           return { url, reference };
         },
       }),
 
+      /**
+       * Redirect-return confirmation for the signed-in user. Rows that belong
+       * to someone else (or to nobody the component knows) only reveal the
+       * outcome code, never the payment.
+       */
       confirmTransaction: actionGeneric({
         args: { transactionId: v.string() },
-        handler: async (ctx, args) => {
-          return await this.confirmTransaction(ctx, { transactionId: args.transactionId });
+        handler: async (ctx, args): Promise<ChargeOutcome> => {
+          const user = await getUser(ctx);
+          const outcome = await this.confirmTransaction(ctx, {
+            transactionId: args.transactionId,
+          });
+          if (outcome.payment && outcome.payment.userId === user.userId) return outcome;
+          return {
+            outcome: outcome.outcome,
+            paymentChanged: false,
+            subscriptionChanged: false,
+            payment: null,
+            subscription: null,
+          };
         },
       }),
 

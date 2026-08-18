@@ -87,6 +87,9 @@ export default defineSchema({
     expMonth: v.optional(v.string()),
     expYear: v.optional(v.string()),
     cardHolder: v.optional(v.string()),
+    // When the customer accepted Wompi's terms and personal-data
+    // authorization (both acceptance tokens are sent with the source).
+    termsAcceptedAt: v.optional(v.number()),
   })
     .index("by_customer_id", ["customerId"])
     .index("by_user_id", ["userId"])
@@ -145,6 +148,11 @@ export default defineSchema({
     periodStart: v.optional(v.number()),
     periodEnd: v.optional(v.number()),
     wompiTransactionId: v.optional(v.string()),
+    // Earlier Wompi transactions for the same reference that a later one
+    // replaced (Web Checkout lets the payer retry a declined attempt within
+    // minutes, producing a DECLINED and an APPROVED transaction that share
+    // the reference).
+    supersededTransactionIds: v.optional(v.array(v.string())),
     paymentMethodType: v.optional(v.string()),
     failureReason: v.optional(v.string()),
     finalizedAt: v.optional(v.number()),
