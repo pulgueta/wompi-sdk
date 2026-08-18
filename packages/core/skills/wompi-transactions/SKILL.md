@@ -2,7 +2,8 @@
 name: wompi-transactions
 description: >
   Full Wompi transaction lifecycle using @pulgueta/wompi. Covers getMerchant
-  for acceptance_token, tokenizeCard and tokenizeNequi, getSignatureKey for
+  for acceptance_token and accept_personal_auth, tokenizeCard and
+  tokenizeNequi, getSignatureKey for
   SHA-256 integrity signature (amountInCents as-is, never multiplied),
   createTransaction with payment_method or payment_source_id, getTransaction,
   listTransactions with from_date/until_date/status filters, voidTransaction
@@ -39,10 +40,11 @@ const wompi = new WompiClient({
   sandbox: process.env.NODE_ENV !== 'production',
 });
 
-// 1. Fresh acceptance token — fetch for each transaction
+// 1. Fresh acceptance tokens — fetch both for each transaction
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
 if (!acceptanceToken) throw new Error('Missing acceptance token');
 
 // 2. Tokenize the card
@@ -67,6 +69,7 @@ const signature = await getSignatureKey({
 // 4. Create the transaction
 const [error, txn] = await wompi.transactions.createTransaction({
   acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   amount_in_cents: amountInCents,
   currency: 'COP',
   signature,
@@ -230,10 +233,11 @@ await wompi.transactions.createTransaction({ acceptance_token: acceptanceToken, 
 Correct:
 
 ```typescript
-// Fetch a fresh token for each transaction
+// Fetch fresh tokens for each transaction
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
 if (!acceptanceToken) throw new Error('Missing acceptance token');
 ```
 

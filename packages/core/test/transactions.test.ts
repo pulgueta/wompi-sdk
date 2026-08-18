@@ -264,6 +264,61 @@ describe("Transactions", () => {
       expect(init.headers.Authorization).toBe(`Bearer ${PRIVATE_KEY}`);
     });
 
+    it("should forward the second acceptance token and the optional documented fields", async () => {
+      const transactions = makeClient(PRIVATE_KEY);
+
+      mockFetch.mockResolvedValueOnce(okJson(TRANSACTION_RESPONSE));
+
+      const [error] = await transactions.createTransaction({
+        acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
+        amount_in_cents: 3000000,
+        currency: "COP",
+        signature: "sig_123",
+        customer_email: "test@example.com",
+        reference: "ref-123",
+        payment_method: { type: "CARD", token: "tok_123", installments: 1 },
+        taxes: [{ type: "VAT", amount_in_cents: 478000 }],
+        ip: "190.0.0.1",
+        recurrent: true,
+        parent_transaction_id: "txn-parent",
+      });
+
+      expect(error).toBeNull();
+
+      const [, options] = mockFetch.mock.calls[0]!;
+      expect(JSON.parse(options.body)).toMatchObject({
+        acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
+        taxes: [{ type: "VAT", amount_in_cents: 478000 }],
+        ip: "190.0.0.1",
+        recurrent: true,
+        parent_transaction_id: "txn-parent",
+      });
+    });
+
+    it("should forward undocumented fields instead of stripping them", async () => {
+      const transactions = makeClient(PRIVATE_KEY);
+
+      mockFetch.mockResolvedValueOnce(okJson(TRANSACTION_RESPONSE));
+
+      const [error] = await transactions.createTransaction({
+        acceptance_token: "eyJhb...",
+        amount_in_cents: 3000000,
+        currency: "COP",
+        signature: "sig_123",
+        customer_email: "test@example.com",
+        reference: "ref-123",
+        payment_method: { type: "CARD", token: "tok_123", installments: 1 },
+        future_field_wompi_added: "keep me",
+      });
+
+      expect(error).toBeNull();
+
+      const [, options] = mockFetch.mock.calls[0]!;
+      expect(JSON.parse(options.body)).toMatchObject({ future_field_wompi_added: "keep me" });
+    });
+
     it("should return [error, null] on invalid input", async () => {
       const transactions = makeClient(PRIVATE_KEY);
 

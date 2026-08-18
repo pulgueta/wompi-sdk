@@ -191,10 +191,11 @@ app.post('/pay', async (c) => {
     return c.json({ error: 'Invalid amount' }, 400);
   }
 
-  // Fresh acceptance token per transaction
+  // Fresh acceptance tokens per transaction — Wompi requires both consents
   const [merchantErr, merchant] = await wompi.merchants.getMerchant();
   if (merchantErr) return c.json({ error: merchantErr.message }, 500);
   const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+  const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
   if (!acceptanceToken) return c.json({ error: 'Could not get acceptance token' }, 500);
 
   // Tokenize card
@@ -218,6 +219,7 @@ app.post('/pay', async (c) => {
   // Create transaction
   const [txnErr, txn] = await wompi.transactions.createTransaction({
     acceptance_token: acceptanceToken,
+    accept_personal_auth: personalAuthToken,
     amount_in_cents: amountInCents,
     currency: 'COP',
     signature,

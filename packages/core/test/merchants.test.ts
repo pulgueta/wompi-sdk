@@ -22,6 +22,11 @@ const MERCHANT_RESPONSE = {
       permalink: "https://wompi.co/terms",
       type: "END_USER_POLICY",
     },
+    presigned_personal_data_auth: {
+      acceptance_token: "eyJwZXJz...",
+      permalink: "https://wompi.co/personal-data",
+      type: "PERSONAL_DATA_AUTH",
+    },
   },
 };
 
@@ -56,6 +61,26 @@ describe("Merchants", () => {
       const [url, options] = mockFetch.mock.calls[0]!;
       expect(url).toContain(`/merchants/${PUBLIC_KEY}`);
       expect(options.method).toBe("GET");
+    });
+
+    it("should expose both presigned acceptance tokens", async () => {
+      const merchants = makeClient();
+
+      mockFetch.mockResolvedValueOnce(okJson(MERCHANT_RESPONSE));
+
+      const [error, data] = await merchants.getMerchant();
+
+      expect(error).toBeNull();
+      expect(data!.presigned_acceptance).toEqual({
+        acceptance_token: "eyJhb...",
+        permalink: "https://wompi.co/terms",
+        type: "END_USER_POLICY",
+      });
+      expect(data!.presigned_personal_data_auth).toEqual({
+        acceptance_token: "eyJwZXJz...",
+        permalink: "https://wompi.co/personal-data",
+        type: "PERSONAL_DATA_AUTH",
+      });
     });
 
     it("should accept payment methods outside the strict enum", async () => {

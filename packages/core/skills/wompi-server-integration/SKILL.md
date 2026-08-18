@@ -44,10 +44,11 @@ const wompi = new WompiClient({
 app.post('/checkout', zValidator('json', TokenizeCardInputSchema), async (c) => {
   const cardInput = c.req.valid('json');
 
-  // 1. Acceptance token
+  // 1. Acceptance tokens
   const [merchantErr, merchant] = await wompi.merchants.getMerchant();
   if (merchantErr) return c.json({ error: merchantErr.message }, 500);
   const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
+  const personalAuthToken = merchant.presigned_personal_data_auth!.acceptance_token;
 
   // 2. Tokenize
   const [tokenErr, token] = await wompi.tokens.tokenizeCard(cardInput);
@@ -65,6 +66,7 @@ app.post('/checkout', zValidator('json', TokenizeCardInputSchema), async (c) => 
   // 4. Create transaction
   const [txnErr, txn] = await wompi.transactions.createTransaction({
     acceptance_token: acceptanceToken,
+    accept_personal_auth: personalAuthToken,
     amount_in_cents: amountInCents,
     currency: 'COP',
     signature,
@@ -104,6 +106,7 @@ new Elysia()
     const [merchantErr, merchant] = await wompi.merchants.getMerchant();
     if (merchantErr) return error(500, merchantErr.message);
     const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
+    const personalAuthToken = merchant.presigned_personal_data_auth!.acceptance_token;
 
     const [tokenErr, token] = await wompi.tokens.tokenizeCard(body);
     if (tokenErr) return error(422, tokenErr.message);
@@ -118,6 +121,7 @@ new Elysia()
 
     const [txnErr, txn] = await wompi.transactions.createTransaction({
       acceptance_token: acceptanceToken,
+      accept_personal_auth: personalAuthToken,
       amount_in_cents: amountInCents,
       currency: 'COP',
       signature,

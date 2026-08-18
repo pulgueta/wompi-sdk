@@ -83,10 +83,12 @@ const wompi = new WompiClient({
   sandbox: true,
 });
 
-// 1. Acceptance token from the merchant.
+// 1. Acceptance tokens from the merchant — Wompi requires both consents.
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw merchantError;
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken =
+  merchant.presigned_personal_data_auth?.acceptance_token;
 if (!acceptanceToken) {
   throw new Error("Missing acceptance token in merchant response");
 }
@@ -113,6 +115,7 @@ const signature = await getSignatureKey({
 // 4. Create the transaction.
 const [error, transaction] = await wompi.transactions.createTransaction({
   acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   amount_in_cents: amountInCents,
   currency: "COP",
   signature,

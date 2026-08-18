@@ -213,6 +213,38 @@ describe("CreateTransactionInputSchema (strict input)", () => {
     expect(CreateTransactionInputSchema.safeParse(base).success).toBe(false);
   });
 
+  it("keeps the second acceptance token and the optional documented fields", () => {
+    const result = CreateTransactionInputSchema.parse({
+      ...base,
+      accept_personal_auth: "personal_auth_tok",
+      payment_method: { type: "CARD" },
+      taxes: [{ type: "VAT", amount_in_cents: 478_000 }],
+      ip: "190.0.0.1",
+      recurrent: true,
+      parent_transaction_id: "txn-parent",
+      payment_method_type: "CARD",
+    });
+
+    expect(result).toMatchObject({
+      accept_personal_auth: "personal_auth_tok",
+      taxes: [{ type: "VAT", amount_in_cents: 478_000 }],
+      ip: "190.0.0.1",
+      recurrent: true,
+      parent_transaction_id: "txn-parent",
+      payment_method_type: "CARD",
+    });
+  });
+
+  it("keeps unknown fields instead of stripping them — the payload is loose", () => {
+    const result = CreateTransactionInputSchema.parse({
+      ...base,
+      payment_method: { type: "CARD" },
+      future_field_wompi_added: "keep me",
+    });
+
+    expect(result).toHaveProperty("future_field_wompi_added", "keep me");
+  });
+
   it("rejects an amount_in_cents above Wompi's maximum", () => {
     expect(
       CreateTransactionInputSchema.safeParse({
