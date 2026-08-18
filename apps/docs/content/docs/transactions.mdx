@@ -19,11 +19,15 @@ The transactions resource handles the actual money movement. There are four meth
 
 ## createTransaction(input)
 
-Create a new transaction. You must include exactly one of `payment_method` or `payment_source_id` — the SDK validates the constraint locally before sending.
+Create a new transaction. You must include at least one of `payment_method` or `payment_source_id` — the SDK validates the constraint locally before sending. Send both to charge a stored card source, which needs `payment_method.installments`.
 
 ```ts
+const [merchantError, merchant] = await wompi.merchants.getMerchant();
+if (merchantError) throw merchantError;
+
 const [error, response] = await wompi.transactions.createTransaction({
-  acceptance_token: acceptance.acceptance_token,
+  acceptance_token: merchant.presigned_acceptance!.acceptance_token,
+  accept_personal_auth: merchant.presigned_personal_data_auth!.acceptance_token,
   amount_in_cents: 2_490_000,
   currency: "COP",
   signature,
@@ -38,35 +42,54 @@ const [error, response] = await wompi.transactions.createTransaction({
 `@pulgueta/wompi/server` — see [Integrity signature](/docs/integrity-signature).
 :::
 
+:::note[Two acceptance tokens]
+Wompi asks the customer for two consents: the end-user policy
+(`acceptance_token`) and the personal-data authorization
+(`accept_personal_auth`). Both come from
+[`merchants.getMerchant()`](/docs/merchants) — `presigned_acceptance` and
+`presigned_personal_data_auth` — and both are short-lived. Show the two
+permalinks before you charge.
+:::
+
 ### Input fields
 
-| Field               | Type       | Notes                                              |
-| ------------------- | ---------- | -------------------------------------------------- |
-| `acceptance_token`  | `string`   | From `merchants.getMerchant()`.                    |
-| `amount_in_cents`   | `integer`  | 1 – 1 000 000 000 000.                             |
-| `currency`          | `"COP"`    | Only value Wompi accepts.                          |
-| `signature`         | `string`   | SHA-256 hex digest.                                |
-| `customer_email`    | `email`    | Receipts go here.                                  |
-| `reference`         | `string`   | Your own merchant reference.                       |
-| `payment_method`    | `object?`  | Exclusive with `payment_source_id`.                |
-| `payment_source_id` | `integer?` | Exclusive with `payment_method`.                   |
-| `redirect_url`      | `url?`     | Where to send the customer after off-site payment. |
-| `expiration_time`   | `string?`  | ISO-8601; must also be hashed in the signature.    |
-| `customer_data`     | `object?`  | `full_name`, `legal_id`, …                         |
-| `shipping_address`  | `object?`  | For physical-goods checkouts.                      |
+| Field                   | Type       | Notes                                                                                                        |
+| ----------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `acceptance_token`      | `string`   | `merchant.presigned_acceptance.acceptance_token`.                                                            |
+| `accept_personal_auth`  | `string?`  | `merchant.presigned_personal_data_auth.acceptance_token`.                                                    |
+| `amount_in_cents`       | `integer`  | 1 – 1 000 000 000 000.                                                                                       |
+| `currency`              | `"COP"`    | Only value Wompi accepts.                                                                                    |
+| `signature`             | `string`   | SHA-256 hex digest.                                                                                          |
+| `customer_email`        | `email`    | Receipts go here.                                                                                            |
+| `reference`             | `string`   | Your own merchant reference.                                                                                 |
+| `payment_method`        | `object?`  | At least one of `payment_method` / `payment_source_id`.                                                      |
+| `payment_source_id`     | `integer?` | At least one of `payment_method` / `payment_source_id`.                                                      |
+| `redirect_url`          | `url?`     | Where to send the customer after off-site payment.                                                           |
+| `expiration_time`       | `string?`  | ISO-8601; must also be hashed in the signature.                                                              |
+| `customer_data`         | `object?`  | `full_name`, `legal_id`, …                                                                                   |
+| `shipping_address`      | `object?`  | For physical-goods checkouts.                                                                                |
+| `taxes`                 | `array?`   | `&#123; type, amount_in_cents &#125;` or `&#123; type, percentage &#125;`; `type` is `VAT` or `CONSUMPTION`. |
+| `ip`                    | `string?`  | Buyer IP address, for risk analysis.                                                                         |
+| `recurrent`             | `boolean?` | Marks the charge as recurring.                                                                               |
+| `parent_transaction_id` | `string?`  | Id of the first transaction of a recurring series.                                                           |
+| `payment_method_type`   | `string?`  | Method type, when Wompi cannot infer it from `payment_method`.                                               |
+
+Any other field Wompi documents also reaches the API — the SDK does not strip unknown keys from this payload.
 
 ### Create with a stored payment source
 
 ```ts
 // Re-charge a stored payment source — no card token, no signature handshake.
 const [error, response] = await wompi.transactions.createTransaction({
-  acceptance_token: acceptance.acceptance_token,
+  acceptance_token: merchant.presigned_acceptance!.acceptance_token,
+  accept_personal_auth: merchant.presigned_personal_data_auth!.acceptance_token,
   amount_in_cents: 1_990_000,
   currency: "COP",
   signature,
   customer_email: "buyer@example.com",
   reference: `recur-${Date.now()}`,
   payment_source_id: 12_345, // requires the private key
+  payment_method: { installments: 1 }, // required for a stored CARD source
 });
 ```
 

@@ -14,7 +14,7 @@ Both methods on this resource require the private key. The SDK returns a
 
 ## createPaymentSource(input)
 
-Promote a one-time token into a reusable source. You'll need a fresh acceptance token from [`merchants.getMerchant()`](/docs/merchants) — Wompi treats this as a separate customer consent.
+Promote a one-time token into a reusable source. You'll need fresh acceptance tokens from [`merchants.getMerchant()`](/docs/merchants) — Wompi treats this as a separate customer consent.
 
 ```ts
 // 1. Tokenize the card (or Nequi account) up-front.
@@ -27,7 +27,7 @@ const [tokenError, token] = await wompi.tokens.tokenizeCard({
 });
 if (tokenError) throw tokenError;
 
-// 2. Fetch a fresh acceptance token from the merchant resource.
+// 2. Fetch fresh acceptance tokens from the merchant resource.
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw merchantError;
 
@@ -36,7 +36,9 @@ const [error, response] = await wompi.paymentSources.createPaymentSource({
   type: "CARD",
   token: token.id,
   acceptance_token: merchant.presigned_acceptance!.acceptance_token,
+  accept_personal_auth: merchant.presigned_personal_data_auth!.acceptance_token,
   customer_email: "buyer@example.com",
+  payment_description: "Suscripcion mensual",
 });
 if (error) throw error;
 
@@ -45,12 +47,16 @@ response.id; // numeric id — store this against your user
 
 ### Input
 
-| Field              | Type     | Notes                                              |
-| ------------------ | -------- | -------------------------------------------------- | ------------------------ |
-| `type`             | `"CARD"  | "NEQUI"`                                           | The token's source kind. |
-| `token`            | `string` | Output of `tokens.tokenizeCard` / `tokenizeNequi`. |
-| `acceptance_token` | `string` | Fresh value from the merchant resource.            |
-| `customer_email`   | `email`  | The customer this source belongs to.               |
+| Field                  | Type      | Notes                                                                                |
+| ---------------------- | --------- | ------------------------------------------------------------------------------------ |
+| `type`                 | `string`  | `"CARD"`, `"NEQUI"`, `"DAVIPLATA"` or `"BANCOLOMBIA_TRANSFER"`.                      |
+| `token`                | `string`  | Output of `tokens.tokenizeCard` / `tokenizeNequi`.                                   |
+| `acceptance_token`     | `string`  | `merchant.presigned_acceptance.acceptance_token`.                                    |
+| `accept_personal_auth` | `string?` | `merchant.presigned_personal_data_auth.acceptance_token` — the second consent.       |
+| `customer_email`       | `email`   | The customer this source belongs to.                                                 |
+| `payment_description`  | `string?` | Text the customer sees when they approve the source, e.g. in the Nequi push message. |
+
+Any other field Wompi documents also reaches the API — the SDK does not strip unknown keys from this payload.
 
 ## getPaymentSource(id)
 
@@ -61,20 +67,27 @@ const [error, response] = await wompi.paymentSources.getPaymentSource(12_345);
 if (error) throw error;
 
 response.id;
-response.status; // "AVAILABLE" | "PENDING"
-response.type; // "CARD" | "NEQUI"
+response.status; // "AVAILABLE", "PENDING" or "VOIDED"
+response.type; // "CARD", "NEQUI", "DAVIPLATA" or "BANCOLOMBIA_TRANSFER"
 ```
 
 ### Response
 
-| Field            | Type         | Notes                                                            |
-| ---------------- | ------------ | ---------------------------------------------------------------- | ------------------------------------------------ | ------------ |
-| `id`             | `number`     | Stable, persist this against your user.                          |
-| `status`         | `"AVAILABLE" | "PENDING"`                                                       | `PENDING` for Nequi until the customer approves. |
-| `type`           | `"CARD"      | "NEQUI"                                                          | undefined`                                       | Source kind. |
-| `token`          | `string?`    | The underlying token.                                            |
-| `customer_email` | `string?`    | Owning customer.                                                 |
-| `public_data`    | `object?`    | `&#123; type, phone_number? &#125;` — safe to surface in the UI. |
+| Field            | Type      | Notes                                                                          |
+| ---------------- | --------- | ------------------------------------------------------------------------------ |
+| `id`             | `number`  | Stable, persist this against your user.                                        |
+| `status`         | `string`  | `"AVAILABLE"`, `"PENDING"` (Nequi, until the customer approves) or `"VOIDED"`. |
+| `type`           | `string?` | `"CARD"`, `"NEQUI"`, `"DAVIPLATA"` or `"BANCOLOMBIA_TRANSFER"`.                |
+| `token`          | `string?` | The underlying token.                                                          |
+| `customer_email` | `string?` | Owning customer.                                                               |
+| `public_data`    | `object?` | `&#123; type, phone_number? &#125;` — safe to surface in the UI.               |
+
+:::note[Strings, not unions]
+`status` and `type` are typed as `string` on the response: Wompi adds source
+kinds and states over time, and a `200` must never fail validation. Import
+the `PaymentSourceType` and `PaymentSourceStatus` types from
+`@pulgueta/wompi/schemas` when you want to narrow to the known values.
+:::
 
 ## Charging a stored source
 
@@ -83,6 +96,7 @@ Drop the `id` into `createTransaction` as `payment_source_id`. Note the change i
 ```ts
 const [error, response] = await wompi.transactions.createTransaction({
   acceptance_token,
+  accept_personal_auth,
   amount_in_cents: 990_000,
   currency: "COP",
   signature,
