@@ -26,8 +26,10 @@ const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw merchantError;
 
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
-const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
-if (!acceptanceToken || !personalAuthToken) throw new Error("Merchant has no acceptance tokens");
+const personalAuthToken =
+  merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken)
+  throw new Error("Merchant has no acceptance tokens");
 
 const [error, response] = await wompi.transactions.createTransaction({
   acceptance_token: acceptanceToken,
