@@ -10,9 +10,28 @@ import { components, internal } from "./_generated/api";
 
 export const WOMPI_DOCS_NAMESPACE = "wompi-docs";
 
-export const rag = new RAG(components.rag, {
-  textEmbeddingModel: gateway.embedding("openai/text-embedding-3-small"),
+// The id must keep the provider prefix; "text-embedding-3-small" alone fails
+// against the AI Gateway.
+const EMBEDDING_MODEL =
+  process.env.AI_GATEWAY_EMBEDDING_MODEL ?? "openai/text-embedding-3-small";
+
+/** Sections used to narrow the docs search. Assigned by the ingest scripts. */
+export const DOC_SECTIONS = [
+  "getting-started",
+  "checkout",
+  "events",
+  "payouts",
+  "plugins",
+  "reports",
+  "sdk",
+] as const;
+
+export type DocSection = (typeof DOC_SECTIONS)[number];
+
+export const rag = new RAG<{ section: string }>(components.rag, {
+  textEmbeddingModel: gateway.embedding(EMBEDDING_MODEL),
   embeddingDimension: 1536,
+  filterNames: ["section"],
 });
 
 /**
@@ -28,6 +47,7 @@ export const ingestDoc = internalAction({
     title: v.string(),
     source: v.string(),
     url: v.optional(v.string()),
+    section: v.optional(v.string()),
     content: v.string(),
   },
   returns: v.null(),
@@ -49,7 +69,11 @@ export const ingestDoc = internalAction({
       metadata: {
         title: args.title,
         ...(args.url !== undefined ? { url: args.url } : {}),
+        ...(args.section !== undefined ? { section: args.section } : {}),
       },
+      ...(args.section !== undefined
+        ? { filterValues: [{ name: "section" as const, value: args.section }] }
+        : {}),
       text: args.content,
     });
     return null;

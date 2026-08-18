@@ -18,8 +18,10 @@ import { internalAction, mutation, query } from "./_generated/server";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { components, internal } from "./_generated/api";
-import { rag, WOMPI_DOCS_NAMESPACE } from "./rag";
+import { DOC_SECTIONS, rag, WOMPI_DOCS_NAMESPACE } from "./rag";
+import type { DocSection } from "./rag";
 
+const CHAT_MODEL = process.env.AI_GATEWAY_CHAT_MODEL ?? "zai/glm-5.2";
 const DEMO_USER_ID = "panabarbero-demo";
 const DEFAULT_THREAD_TITLE = "Asistente Wompi";
 const AGENT_NAME = DEFAULT_THREAD_TITLE;
@@ -178,8 +180,8 @@ const SDK_TOPIC_ALIASES: Record<string, string> = {
 
 const searchWompiDocs = createTool({
   description:
-    "Busca en la documentación oficial de Wompi y del SDK @pulgueta/wompi. Úsala SIEMPRE antes de responder cualquier pregunta.",
-  inputSchema: jsonSchema<{ query: string }>({
+    "Busca en la documentación oficial de Wompi y del SDK @pulgueta/wompi. Úsala SIEMPRE antes de responder cualquier pregunta. Puedes acotar la búsqueda a una sección con el parámetro section.",
+  inputSchema: jsonSchema<{ query: string; section?: DocSection }>({
     type: "object",
     properties: {
       query: {
@@ -187,15 +189,24 @@ const searchWompiDocs = createTool({
         description:
           "Consulta en lenguaje natural sobre Wompi, sus APIs o el SDK",
       },
+      section: {
+        type: "string",
+        enum: [...DOC_SECTIONS],
+        description:
+          "Sección opcional para acotar la búsqueda: getting-started (llaves, ambientes, transacciones, errores), checkout (widget, datos de prueba), events (eventos y seguimiento), payouts (Pagos a Terceros y BRE-B), plugins (WooCommerce, Shopify, VTEX…), reports (reportes), sdk (docs del SDK @pulgueta/wompi)",
+      },
     },
     required: ["query"],
     additionalProperties: false,
   }),
-  execute: async (ctx, { query }) => {
+  execute: async (ctx, { query, section }) => {
     const { results, entries } = await rag.search(ctx, {
       namespace: WOMPI_DOCS_NAMESPACE,
       query,
       limit: 5,
+      ...(section !== undefined
+        ? { filters: [{ name: "section" as const, value: section }] }
+        : {}),
     });
     if (results.length === 0) {
       return "No se encontraron documentos en el índice. (¿Ya se ejecutó `pnpm ingest-docs` con OPENAI_API_KEY configurada?)";
@@ -284,7 +295,7 @@ const getSdkExample = createTool({
 
 export const wompiAgent = new Agent(components.agent, {
   name: AGENT_NAME,
-  languageModel: gateway("zai/glm-5.2"),
+  languageModel: gateway(CHAT_MODEL),
   instructions: `Eres el "Asistente Wompi" del demo PanaBarbero: un asistente de integración de pagos Wompi (Colombia) construido con el SDK @pulgueta/wompi.
 
 Reglas:
