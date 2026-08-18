@@ -227,7 +227,8 @@ Wompi has no subscription engine, so the component is one:
    arrives (timeout, 5xx, network) is left pending rather than marked failed:
    the next claim reuses the same reference, Wompi rejects the duplicate, and
    the existing transaction is reconciled — never a second charge. Only a
-   rejected request (4xx) finalizes an attempt as `error`.
+   request Wompi actually rejected (validation, not found, other 4xx except
+   408 and 429) finalizes an attempt as `error`.
 4. Failed renewals walk a dunning ladder (default retries at +1d, +2d, +4d;
    `past_due` keeps access as grace). Exhausted dunning marks the subscription
    `unpaid` (or `canceled`, your choice). Price snapshots are taken at
@@ -266,6 +267,12 @@ the two can skip a callback (at-most-once) — a webhook retry reprocesses the
 delivery when the state was not applied, but not when only the callback was
 lost. Reconcile from `payments`/`subscriptions` if your side effects must be
 exact.
+
+`registerRoutes(http, { onEvent })` is different: it runs for every verified
+delivery that was not already applied. Two deliveries of the same event that
+overlap before the first outcome is stored, or a redelivery after a crash
+mid-apply, both reach `onEvent` — make it idempotent (key on
+`event.signature.checksum` or the transaction id).
 
 ## Dispersions (Pagos a Terceros)
 
