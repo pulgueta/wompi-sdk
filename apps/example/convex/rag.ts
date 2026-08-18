@@ -11,7 +11,8 @@ import { components, internal } from "./_generated/api";
 export const WOMPI_DOCS_NAMESPACE = "wompi-docs";
 
 // The id must keep the provider prefix; "text-embedding-3-small" alone fails
-// against the AI Gateway.
+// against the AI Gateway. The model must output 1,536 dimensions to match
+// `embeddingDimension` below (see README).
 const EMBEDDING_MODEL =
   process.env.AI_GATEWAY_EMBEDDING_MODEL ?? "openai/text-embedding-3-small";
 

@@ -27,7 +27,7 @@ npx convex env set AI_GATEWAY_CHAT_MODEL zai/glm-5.2                    # option
 npx convex env set AI_GATEWAY_EMBEDDING_MODEL openai/text-embedding-3-small  # optional, this is the default
 ```
 
-Both model ids need the provider prefix — an id without it fails against the AI Gateway. Changing `AI_GATEWAY_EMBEDDING_MODEL` (or its dimension) invalidates the index: re-ingest the corpus after the change.
+Both model ids need the provider prefix — an id without it fails against the AI Gateway. The RAG index is fixed at 1,536 dimensions (`embeddingDimension` in `convex/rag.ts`), so `AI_GATEWAY_EMBEDDING_MODEL` must be a 1,536-dimension model — `openai/text-embedding-3-small` (default) or `openai/text-embedding-ada-002`. A model with another output size needs a matching `embeddingDimension` change. Either change invalidates the index: re-ingest the corpus afterwards.
 
 Install dependencies from the monorepo root, then provision and run the example:
 
