@@ -174,6 +174,7 @@ describe("PaymentMethodTypeSchema (strict input filter)", () => {
 describe("CreateTransactionInputSchema (strict input)", () => {
   const base = {
     acceptance_token: "acc_tok",
+    accept_personal_auth: "personal_auth_tok",
     amount_in_cents: 2_490_000,
     currency: "COP",
     signature: "sig",
@@ -211,6 +212,51 @@ describe("CreateTransactionInputSchema (strict input)", () => {
 
   it("rejects passing neither payment_method nor payment_source_id", () => {
     expect(CreateTransactionInputSchema.safeParse(base).success).toBe(false);
+  });
+
+  it("requires both acceptance tokens", () => {
+    const { acceptance_token: _acceptance, ...withoutAcceptance } = base;
+    const { accept_personal_auth: _personal, ...withoutPersonal } = base;
+
+    expect(
+      CreateTransactionInputSchema.safeParse({ ...withoutAcceptance, payment_method: { type: "CARD" } })
+        .success
+    ).toBe(false);
+    expect(
+      CreateTransactionInputSchema.safeParse({ ...withoutPersonal, payment_method: { type: "CARD" } })
+        .success
+    ).toBe(false);
+  });
+
+  it("keeps the second acceptance token and the optional documented fields", () => {
+    const result = CreateTransactionInputSchema.parse({
+      ...base,
+      payment_method: { type: "CARD" },
+      taxes: [{ type: "VAT", amount_in_cents: 478_000 }],
+      ip: "190.0.0.1",
+      recurrent: true,
+      parent_transaction_id: "txn-parent",
+      payment_method_type: "CARD",
+    });
+
+    expect(result).toMatchObject({
+      accept_personal_auth: "personal_auth_tok",
+      taxes: [{ type: "VAT", amount_in_cents: 478_000 }],
+      ip: "190.0.0.1",
+      recurrent: true,
+      parent_transaction_id: "txn-parent",
+      payment_method_type: "CARD",
+    });
+  });
+
+  it("keeps unknown fields instead of stripping them — the payload is loose", () => {
+    const result = CreateTransactionInputSchema.parse({
+      ...base,
+      payment_method: { type: "CARD" },
+      future_field_wompi_added: "keep me",
+    });
+
+    expect(result).toHaveProperty("future_field_wompi_added", "keep me");
   });
 
   it("rejects an amount_in_cents above Wompi's maximum", () => {

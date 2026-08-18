@@ -15,7 +15,7 @@ Each route uses `sandbox: true`. `4242 4242 4242 4242` is approved;
 
 ## Framework examples
 
-Four steps regardless of framework — fetch the acceptance token, tokenize the card, sign the amount, create the transaction. Pick your stack:
+Four steps regardless of framework — fetch both acceptance tokens, tokenize the card, sign the amount, create the transaction. Pick your stack:
 
 <Tabs>
 <Tab title="Astro">
@@ -39,6 +39,10 @@ sandbox: true,
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) return Response.json({ error: merchantError.message }, { status: 502 });
 
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) return Response.json({ error: "Merchant has no acceptance tokens" }, { status: 502 });
+
 const [tokenError, token] = await wompi.tokens.tokenizeCard(card);
 if (tokenError) return Response.json({ error: tokenError.message }, { status: 422 });
 
@@ -46,7 +50,8 @@ const reference = `order-${Date.now()}`;
 const signature = await getSignatureKey({ reference, amountInCents, integrityKey: WOMPI_INTEGRITY_KEY });
 
 const [transactionError, transaction] = await wompi.transactions.createTransaction({
-acceptance_token: merchant.presigned_acceptance!.acceptance_token,
+acceptance_token: acceptanceToken,
+accept_personal_auth: personalAuthToken,
 amount_in_cents: amountInCents,
 currency: "COP",
 signature,
@@ -79,6 +84,10 @@ sandbox: true,
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) return NextResponse.json({ error: merchantError.message }, { status: 502 });
 
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) return NextResponse.json({ error: "Merchant has no acceptance tokens" }, { status: 502 });
+
 const [tokenError, token] = await wompi.tokens.tokenizeCard(card);
 if (tokenError) return NextResponse.json({ error: tokenError.message }, { status: 422 });
 
@@ -90,7 +99,8 @@ integrityKey: process.env.WOMPI_INTEGRITY_KEY!,
 });
 
 const [transactionError, transaction] = await wompi.transactions.createTransaction({
-acceptance_token: merchant.presigned_acceptance!.acceptance_token,
+acceptance_token: acceptanceToken,
+accept_personal_auth: personalAuthToken,
 amount_in_cents: amountInCents,
 currency: "COP",
 signature,
@@ -129,6 +139,10 @@ sandbox: true,
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw new Error(merchantError.message);
 
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error("Merchant has no acceptance tokens");
+
 const [tokenError, token] = await wompi.tokens.tokenizeCard(card);
 if (tokenError) throw new Error(tokenError.message);
 
@@ -140,7 +154,8 @@ integrityKey: process.env.WOMPI_INTEGRITY_KEY!,
 });
 
 const [transactionError, transaction] = await wompi.transactions.createTransaction({
-acceptance_token: merchant.presigned_acceptance!.acceptance_token,
+acceptance_token: acceptanceToken,
+accept_personal_auth: personalAuthToken,
 amount_in_cents: amountInCents,
 currency: "COP",
 signature,
@@ -173,6 +188,10 @@ sandbox: true,
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw new Error(merchantError.message);
 
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error("Merchant has no acceptance tokens");
+
 const [tokenError, token] = await wompi.tokens.tokenizeCard(card);
 if (tokenError) throw new Error(tokenError.message);
 
@@ -184,7 +203,8 @@ integrityKey: Bun.env.WOMPI_INTEGRITY_KEY!,
 });
 
 const [transactionError, transaction] = await wompi.transactions.createTransaction({
-acceptance_token: merchant.presigned_acceptance!.acceptance_token,
+acceptance_token: acceptanceToken,
+accept_personal_auth: personalAuthToken,
 amount_in_cents: amountInCents,
 currency: "COP",
 signature,

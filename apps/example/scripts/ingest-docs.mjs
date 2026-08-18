@@ -57,6 +57,8 @@ for (const file of files) {
   const payload = {
     title: titleOf(frontmatter, trimmed, source),
     source,
+    // Repository docs and READMEs are the SDK section of the corpus.
+    section: "sdk",
     content: trimmed,
   };
 

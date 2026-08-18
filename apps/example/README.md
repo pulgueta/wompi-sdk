@@ -23,7 +23,11 @@ The assistant's Vercel AI Gateway key lives on the Convex deployment:
 ```bash
 cd apps/example
 npx convex env set AI_GATEWAY_API_KEY vck_...
+npx convex env set AI_GATEWAY_CHAT_MODEL zai/glm-5.2                    # optional, this is the default
+npx convex env set AI_GATEWAY_EMBEDDING_MODEL openai/text-embedding-3-small  # optional, this is the default
 ```
+
+Both model ids need the provider prefix — an id without it fails against the AI Gateway. The RAG index is fixed at 1,536 dimensions (`embeddingDimension` in `convex/rag.ts`), so `AI_GATEWAY_EMBEDDING_MODEL` must be a 1,536-dimension model — `openai/text-embedding-3-small` (default) or `openai/text-embedding-ada-002`. A model with another output size needs a matching `embeddingDimension` change. Either change invalidates the index: re-ingest the corpus afterwards.
 
 Install dependencies from the monorepo root, then provision and run the example:
 
@@ -43,6 +47,12 @@ pnpm ingest-wompi-docs  # 60 official docs.wompi.co pages
 
 `ingest-wompi-docs` fetches the official pages as markdown, so it requires
 network access and the local `curl.md` helper on `PATH`.
+
+Each document is tagged with a section (`getting-started`, `checkout`, `events`, `payouts`, `plugins`, `reports`, `sdk`) so the assistant can narrow a search. A corpus ingested before the tag existed has no sections — re-ingest to get the filter.
+
+### `stopWhen` trap
+
+`@convex-dev/agent` stops after the first tool call unless the agent sets `stopWhen: stepCountIs(n)`. Without it the run ends with `finishReason: "tool-calls"`, no answer is written, and the UI shows empty bubbles. See `stopWhen: stepCountIs(8)` in `convex/chat.ts`.
 
 ## Webhooks
 

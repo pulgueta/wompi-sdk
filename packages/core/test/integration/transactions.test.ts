@@ -29,11 +29,13 @@ describe.skipIf(!canRun)("sandbox · transaction lifecycle", () => {
   it("creates a transaction with a getSignatureKey signature, reads it, then voids it", async () => {
     const wompi = sandboxClient();
 
-    // 1. Acceptance token from the merchant.
+    // 1. Both acceptance tokens from the merchant.
     const [merchantError, merchant] = await wompi.merchants.getMerchant();
     expect(merchantError).toBeNull();
     const acceptanceToken = merchant?.presigned_acceptance?.acceptance_token;
+    const personalAuthToken = merchant?.presigned_personal_data_auth?.acceptance_token;
     expect(acceptanceToken).toBeTruthy();
+    expect(personalAuthToken).toBeTruthy();
 
     // 2. Tokenize the approved test card.
     const [tokenError, token] = await wompi.tokens.tokenizeCard({
@@ -58,6 +60,7 @@ describe.skipIf(!canRun)("sandbox · transaction lifecycle", () => {
     // 4. Create the transaction.
     const [createError, created] = await wompi.transactions.createTransaction({
       acceptance_token: acceptanceToken,
+      accept_personal_auth: personalAuthToken,
       amount_in_cents: amountInCents,
       currency: "COP",
       signature,

@@ -87,6 +87,9 @@ export default defineSchema({
     expMonth: v.optional(v.string()),
     expYear: v.optional(v.string()),
     cardHolder: v.optional(v.string()),
+    // When the customer accepted Wompi's terms (the source was created with
+    // the merchant's presigned acceptance token).
+    termsAcceptedAt: v.optional(v.number()),
   })
     .index("by_customer_id", ["customerId"])
     .index("by_user_id", ["userId"])
@@ -121,6 +124,9 @@ export default defineSchema({
     // Scheduled plan change, applied at the next renewal (no proration).
     pendingProductId: v.optional(v.id("products")),
     pendingProductKey: v.optional(v.string()),
+    // Resume charges minted for this subscription (incomplete/unpaid retries
+    // through `subscriptions.create`); numbers their references.
+    resumeAttempts: v.optional(v.number()),
     metadata: v.optional(v.record(v.string(), v.any())),
   })
     .index("by_user_id", ["userId"])
@@ -145,6 +151,11 @@ export default defineSchema({
     periodStart: v.optional(v.number()),
     periodEnd: v.optional(v.number()),
     wompiTransactionId: v.optional(v.string()),
+    // Earlier Wompi transactions for the same reference that a later one
+    // replaced (Web Checkout lets the payer retry a declined attempt within
+    // minutes, producing a DECLINED and an APPROVED transaction that share
+    // the reference).
+    supersededTransactionIds: v.optional(v.array(v.string())),
     paymentMethodType: v.optional(v.string()),
     failureReason: v.optional(v.string()),
     finalizedAt: v.optional(v.number()),
@@ -153,6 +164,7 @@ export default defineSchema({
     .index("by_reference", ["reference"])
     .index("by_user_id", ["userId"])
     .index("by_subscription_id", ["subscriptionId"])
+    .index("by_subscription_id_status", ["subscriptionId", "status"])
     .index("by_wompi_transaction_id", ["wompiTransactionId"])
     .index("by_status", ["status"]),
 

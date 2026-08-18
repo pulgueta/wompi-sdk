@@ -2,8 +2,9 @@
 name: wompi-payment-sources
 description: >
   Create and retrieve reusable Wompi payment sources using @pulgueta/wompi.
-  Covers createPaymentSource (CARD or NEQUI, requires acceptance_token and
-  privateKey), getPaymentSource, PaymentSourceStatus (AVAILABLE/PENDING),
+  Covers createPaymentSource (CARD, NEQUI, DAVIPLATA or BANCOLOMBIA_TRANSFER;
+  requires acceptance_token, accept_personal_auth and privateKey),
+  getPaymentSource, PaymentSourceStatus (AVAILABLE/PENDING/VOIDED),
   and charging a customer via payment_source_id in createTransaction.
   Load when building recurring billing, saved payment methods, or subscription flows.
 type: core
@@ -32,10 +33,12 @@ const wompi = new WompiClient({
   sandbox: process.env.NODE_ENV !== 'production',
 });
 
-// 1. Get acceptance token
+// 1. Get both acceptance tokens
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
-const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 
 // 2. Tokenize the card
 const [tokenErr, token] = await wompi.tokens.tokenizeCard({
@@ -52,6 +55,7 @@ const [sourceErr, source] = await wompi.paymentSources.createPaymentSource({
   type: 'CARD',
   token: token.id,
   acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   customer_email: 'maria@example.com',
 });
 if (sourceErr) throw sourceErr;
@@ -75,6 +79,7 @@ const [sourceErr, source] = await wompi.paymentSources.createPaymentSource({
   type: 'NEQUI',
   token: nequiToken.id,
   acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   customer_email: 'user@example.com',
 });
 if (sourceErr) throw sourceErr;
@@ -112,10 +117,13 @@ const signature = await getSignatureKey({
 
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
-const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 
 const [error, txn] = await wompi.transactions.createTransaction({
   acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   amount_in_cents: amountInCents,
   currency: 'COP',
   signature,
@@ -157,7 +165,7 @@ Source: `packages/core/src/client/payment-sources/index.ts`
 
 ---
 
-### HIGH Omitting `acceptance_token` when creating a payment source
+### HIGH Omitting the acceptance tokens when creating a payment source
 
 Wrong:
 
@@ -166,7 +174,7 @@ await wompi.paymentSources.createPaymentSource({
   type: 'CARD',
   token: cardToken.id,
   customer_email: 'user@example.com',
-  // acceptance_token missing — Zod validation fails before HTTP call
+  // acceptance_token and accept_personal_auth missing — Zod validation fails before HTTP call
 });
 ```
 
@@ -175,17 +183,20 @@ Correct:
 ```typescript
 const [merchantErr, merchant] = await wompi.merchants.getMerchant();
 if (merchantErr) throw merchantErr;
-const acceptanceToken = merchant.presigned_acceptance!.acceptance_token;
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error('Missing acceptance tokens');
 
 await wompi.paymentSources.createPaymentSource({
   type: 'CARD',
   token: cardToken.id,
   customer_email: 'user@example.com',
   acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
 });
 ```
 
-`acceptance_token` is required in `createPaymentSource` — same merchant acceptance token used for transactions. Fetch it fresh before each call.
+Both `acceptance_token` and `accept_personal_auth` are required in `createPaymentSource` — the same merchant tokens used for transactions. Fetch both fresh before each call, show the two permalinks (`presigned_acceptance.permalink`, `presigned_personal_data_auth.permalink`) to the customer, and send the tokens only after they accept.
 
 Source: `packages/core/src/schemas.ts` — `CreatePaymentSourceInputSchema`
 

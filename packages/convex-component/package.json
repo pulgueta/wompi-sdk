@@ -19,14 +19,17 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc --project ./tsconfig.build.json",
-    "build:clean": "rm -rf dist *.tsbuildinfo && pnpm run build",
+    "build": "rm -rf dist *.tsbuildinfo && tsc --project ./tsconfig.build.json",
+    "build:clean": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run --typecheck",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:coverage": "vitest run --coverage --coverage.reporter=text"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",
@@ -65,6 +68,11 @@
   "peerDependencies": {
     "convex": "^1.36.1",
     "react": "^18.3.1 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^2.0.0",

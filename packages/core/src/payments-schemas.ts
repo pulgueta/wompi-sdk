@@ -29,9 +29,14 @@ export const TransactionStatusSchema = z.enum([
   "VOIDED",
 ]);
 
-export const PaymentSourceTypeSchema = z.enum(["CARD", "NEQUI"]);
+export const PaymentSourceTypeSchema = z.enum([
+  "CARD",
+  "NEQUI",
+  "DAVIPLATA",
+  "BANCOLOMBIA_TRANSFER",
+]);
 
-export const PaymentSourceStatusSchema = z.enum(["AVAILABLE", "PENDING"]);
+export const PaymentSourceStatusSchema = z.enum(["AVAILABLE", "PENDING", "VOIDED"]);
 
 export const NequiTokenStatusSchema = z.enum(["PENDING", "APPROVED", "DECLINED"]);
 
@@ -41,7 +46,7 @@ export const TaxTypeSchema = z.enum(["VAT", "CONSUMPTION"]);
 
 export const OrderDirectionSchema = z.enum(["DESC", "ASC"]);
 
-export const AcceptanceTypeSchema = z.literal("END_USER_POLICY");
+export const AcceptanceTypeSchema = z.enum(["END_USER_POLICY", "PERSONAL_DATA_AUTH"]);
 
 export const MerchantLegalIdTypeSchema = z.enum(["NIT", "CC"]);
 
@@ -75,21 +80,51 @@ export const TransactionPaymentMethodSchema = z
   })
   .loose();
 
+export const TaxByAmountSchema = z.object({
+  type: TaxTypeSchema,
+  amount_in_cents: z.number().int().min(1).max(MAX_AMOUNT_IN_CENTS),
+});
+
+export const TaxByPercentageSchema = z.object({
+  type: TaxTypeSchema,
+  percentage: z.number().int().min(1).max(50),
+});
+
+export const TaxSchema = z.union([TaxByAmountSchema, TaxByPercentageSchema]);
+
+/**
+ * `POST /transactions` payload.
+ *
+ * Wompi requires two acceptance tokens: `acceptance_token` (from
+ * `merchant.presigned_acceptance`) and `accept_personal_auth` (from
+ * `merchant.presigned_personal_data_auth`). Both are required here, so a
+ * request without them is rejected locally before anything is sent.
+ *
+ * The object is `.loose()` so any field Wompi documents but the SDK does not
+ * name still reaches the API — stripping it would silently change the request.
+ */
 export const CreateTransactionInputSchema = z
   .object({
     acceptance_token: z.string(),
+    accept_personal_auth: z.string(),
     amount_in_cents: z.number().int().min(1).max(MAX_AMOUNT_IN_CENTS),
     currency: CurrencySchema,
     signature: z.string(),
     customer_email: z.email(),
     payment_method: TransactionPaymentMethodSchema.optional(),
+    payment_method_type: z.string().optional(),
     payment_source_id: z.number().int().positive().optional(),
     redirect_url: z.url().optional(),
     reference: z.string(),
     expiration_time: z.string().optional(),
     customer_data: CustomerDataSchema.optional(),
     shipping_address: ShippingAddressSchema.optional(),
+    taxes: z.array(TaxSchema).optional(),
+    ip: z.string().optional(),
+    recurrent: z.boolean().optional(),
+    parent_transaction_id: z.string().optional(),
   })
+  .loose()
   .refine((data) => data.payment_method !== undefined || data.payment_source_id !== undefined, {
     message: "Provide payment_method, payment_source_id, or both",
   });
@@ -195,28 +230,49 @@ export const NequiTokenSchema = z
   })
   .loose();
 
-export const PaymentSourcePublicDataSchema = z.object({
-  type: PaymentSourceTypeSchema,
-  phone_number: z.string().optional(),
-});
+export const PaymentSourcePublicDataSchema = z
+  .object({
+    type: z.string(),
+    phone_number: z.string().optional(),
+  })
+  .loose();
 
+/**
+ * Response shape of a payment source.
+ *
+ * `type` and `status` stay plain strings: Wompi adds source kinds and states over
+ * time, and a `200` must never surface as a validation error. Use
+ * {@link PaymentSourceTypeSchema} / {@link PaymentSourceStatusSchema} (and their
+ * `PaymentSourceType` / `PaymentSourceStatus` types) to narrow on the known values.
+ */
 export const PaymentSourceSchema = z
   .object({
     id: z.number().int(),
-    status: PaymentSourceStatusSchema,
-    type: PaymentSourceTypeSchema.optional(),
+    status: z.string(),
+    type: z.string().optional(),
     token: z.string().optional(),
     customer_email: z.string().optional(),
     public_data: PaymentSourcePublicDataSchema.optional(),
   })
   .loose();
 
-export const CreatePaymentSourceInputSchema = z.object({
-  type: PaymentSourceTypeSchema,
-  token: z.string(),
-  acceptance_token: z.string(),
-  customer_email: z.email(),
-});
+/**
+ * `POST /payment_sources` payload.
+ *
+ * Like a transaction, a payment source needs both acceptance tokens:
+ * `acceptance_token` and `accept_personal_auth`. `.loose()` for the same reason —
+ * documented fields the SDK does not name must still reach Wompi.
+ */
+export const CreatePaymentSourceInputSchema = z
+  .object({
+    type: PaymentSourceTypeSchema,
+    token: z.string(),
+    acceptance_token: z.string(),
+    accept_personal_auth: z.string(),
+    customer_email: z.email(),
+    payment_description: z.string().optional(),
+  })
+  .loose();
 
 export const CustomerReferenceSchema = z.object({
   label: z.string().max(24),
@@ -226,18 +282,6 @@ export const CustomerReferenceSchema = z.object({
 export const PaymentLinkCustomerDataSchema = z.object({
   customer_references: z.array(CustomerReferenceSchema).max(2).optional(),
 });
-
-export const TaxByAmountSchema = z.object({
-  type: TaxTypeSchema,
-  amount_in_cents: z.number().int().min(1).max(MAX_AMOUNT_IN_CENTS),
-});
-
-export const TaxByPercentageSchema = z.object({
-  type: TaxTypeSchema,
-  percentage: z.number().int().min(1).max(50),
-});
-
-export const TaxSchema = z.union([TaxByAmountSchema, TaxByPercentageSchema]);
 
 export const CreatePaymentLinkInputSchema = z.object({
   name: z.string(),
@@ -318,6 +362,7 @@ export const MerchantSchema = z
     accepted_payment_methods: z.array(z.string()).optional(),
     accepted_currencies: z.array(CurrencySchema).optional(),
     presigned_acceptance: PresignedAcceptanceSchema.optional(),
+    presigned_personal_data_auth: PresignedAcceptanceSchema.optional(),
   })
   .loose();
 

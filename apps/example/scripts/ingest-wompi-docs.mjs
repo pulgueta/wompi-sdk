@@ -109,6 +109,48 @@ export const WOMPI_DOCS = [
   ["WompiJs (deprecada)", "js"],
 ];
 
+// Sections mirror DOC_SECTIONS in convex/rag.ts and feed the `section` filter
+// of the searchWompiDocs tool.
+
+// "API Pagos a terceros: …" pages whose slug has no payouts marker.
+const PAYOUT_SLUGS = new Set([
+  "crea-tu-primer-lote",
+  "consultas-y-operaciones",
+]);
+const PLUGIN_SLUGS = new Set([
+  "woocommerce-wordpress-plugin",
+  "wompi-shopify-plugin",
+  "jumpseller-plugin",
+  "magento-plugin",
+  "prestashop-plugin",
+  "wompi-vtex",
+]);
+const EVENT_SLUGS = new Set([
+  "eventos",
+  "seguimiento-de-transacciones",
+  "reintento-de-pago",
+]);
+const CHECKOUT_SLUGS = new Set([
+  "widget-checkout-web",
+  "datos-de-prueba-en-sandbox",
+  "ambientes-y-llaves",
+]);
+
+export const sectionFor = (slug) => {
+  if (
+    slug.includes("pagos-a-terceros") ||
+    slug.includes("breb") ||
+    PAYOUT_SLUGS.has(slug)
+  ) {
+    return "payouts";
+  }
+  if (PLUGIN_SLUGS.has(slug)) return "plugins";
+  if (slug.startsWith("reporte-")) return "reports";
+  if (EVENT_SLUGS.has(slug)) return "events";
+  if (CHECKOUT_SLUGS.has(slug)) return "checkout";
+  return "getting-started";
+};
+
 const fetchMarkdown = (slug) => {
   const cached = join(cacheDir, `${slug}.md`);
   if (existsSync(cached)) {
@@ -145,6 +187,7 @@ for (const [title, slug] of selected) {
         title,
         source: `wompi-docs/${slug}`,
         url: `${BASE}/${slug}/`,
+        section: sectionFor(slug),
         content,
       };
       console.log(`Ingesting wompi-docs/${slug} (${content.length} chars)…`);

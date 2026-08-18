@@ -26,11 +26,12 @@ const sandboxClient = () =>
   });
 
 describe.skipIf(!publicKey)("sandbox · read-only endpoints", () => {
-  it("getMerchant returns the presigned acceptance token", async () => {
+  it("getMerchant returns both presigned acceptance tokens", async () => {
     const [error, merchant] = await sandboxClient().merchants.getMerchant();
 
     expect(error).toBeNull();
     expect(merchant?.presigned_acceptance?.acceptance_token).toBeTruthy();
+    expect(merchant?.presigned_personal_data_auth?.acceptance_token).toBeTruthy();
   });
 
   it("getFinancialInstitutions returns the PSE bank list", async () => {

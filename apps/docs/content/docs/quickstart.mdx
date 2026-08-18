@@ -21,16 +21,20 @@ export const wompi = new WompiClient({
 });
 ```
 
-## 2. Fetch the acceptance token
+## 2. Fetch the acceptance tokens
 
-Every transaction must include the merchant's presigned acceptance token — proof that the customer accepted the merchant's policies. Fetch it from the merchant endpoint.
+Every transaction must include two presigned tokens — proof that the customer accepted the merchant's end-user policy and the personal-data authorization. Fetch both from the merchant endpoint.
 
 ```ts
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw merchantError;
 
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
-if (!acceptanceToken) throw new Error("Merchant has no acceptance token");
+const personalAuthToken =
+  merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) {
+  throw new Error("Merchant has no acceptance tokens");
+}
 ```
 
 ## 3. Tokenize the card
@@ -77,12 +81,13 @@ Read [Integrity signature](/docs/integrity-signature) for the full rules — inc
 
 ## 5. Create the transaction
 
-Stitch it together: the acceptance token, the signed amount, the card token, the reference and a customer email. The response status starts at `PENDING` — poll `getTransaction(id)` until it resolves.
+Stitch it together: the two acceptance tokens, the signed amount, the card token, the reference and a customer email. The response status starts at `PENDING` — poll `getTransaction(id)` until it resolves.
 
 ```ts
 const [transactionError, transaction] =
   await wompi.transactions.createTransaction({
     acceptance_token: acceptanceToken,
+    accept_personal_auth: personalAuthToken,
     amount_in_cents: amountInCents,
     currency: "COP",
     signature,

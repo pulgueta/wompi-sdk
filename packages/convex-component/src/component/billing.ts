@@ -23,6 +23,9 @@ export const chargeOutcomeValidator = v.object({
   note: v.optional(v.string()),
 });
 
+/** Settled statuses a later APPROVED/VOIDED transaction may still move. */
+const REOPENABLE_STATUSES: PaymentStatus[] = ["declined", "error", "expired"];
+
 type ChargeOutcomeInput = {
   nextStatus: PaymentStatus;
   wompiTransactionId?: string;
@@ -44,10 +47,15 @@ const applyChargeOutcome = async (
   const now = Date.now();
   const next = input.nextStatus;
 
+  // Allowed transitions. A failed or expired attempt may still end approved
+  // (or voided) later: Web Checkout lets the payer retry a declined payment
+  // within minutes under the same reference, and late webhooks can land
+  // after the sweep expired an abandoned checkout.
   const statusChanges =
     payment.status !== next &&
     (payment.status === "pending" ||
-      (payment.status === "expired" && (next === "approved" || next === "voided")) ||
+      (REOPENABLE_STATUSES.includes(payment.status) &&
+        (next === "approved" || next === "voided")) ||
       (payment.status === "approved" && next === "voided"));
 
   const patch: Partial<Doc<"payments">> = {};
@@ -55,11 +63,22 @@ const applyChargeOutcome = async (
     patch.status = next;
     if (next !== "pending") patch.finalizedAt = now;
     if (input.failureReason) patch.failureReason = input.failureReason;
+    if (next === "approved") patch.failureReason = undefined;
   }
-  if (input.wompiTransactionId && !payment.wompiTransactionId) {
-    patch.wompiTransactionId = input.wompiTransactionId;
+  if (input.wompiTransactionId && input.wompiTransactionId !== payment.wompiTransactionId) {
+    if (!payment.wompiTransactionId) {
+      patch.wompiTransactionId = input.wompiTransactionId;
+    } else if (statusChanges) {
+      // A different Wompi transaction resolved this reference (payer retry):
+      // track the new one and keep the previous id for audit.
+      patch.wompiTransactionId = input.wompiTransactionId;
+      patch.supersededTransactionIds = [
+        ...(payment.supersededTransactionIds ?? []),
+        payment.wompiTransactionId,
+      ];
+    }
   }
-  if (input.paymentMethodType && !payment.paymentMethodType) {
+  if (input.paymentMethodType && (!payment.paymentMethodType || statusChanges)) {
     patch.paymentMethodType = input.paymentMethodType;
   }
 

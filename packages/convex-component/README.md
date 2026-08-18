@@ -134,9 +134,13 @@ const buy = async () => {
 ```
 
 The action creates a pending `payments` row with a unique reference, signs the
-amount with your integrity key, and returns the redirect URL. Wompi sends the
-customer back with `?id=<transactionId>` — confirm it for instant feedback
-(webhooks resolve it anyway):
+amount with your integrity key, and returns the redirect URL. The prebuilt
+action only takes a `productKey`: the amount always comes from your catalog,
+never from the browser. For custom amounts, descriptions or metadata call
+`wompi.checkout(ctx, { redirectUrl, amountInCents, metadata })` from your own
+server function, where you control the inputs. Wompi sends the customer back
+with `?id=<transactionId>` — confirm it for instant feedback (webhooks resolve
+it anyway):
 
 ```tsx
 const confirm = useAction(api.wompi.confirmTransaction);
@@ -149,7 +153,11 @@ useEffect(() => {
 
 `confirmTransaction` fetches the transaction from the Wompi API and runs it
 through the same idempotent state machine webhooks use — safe to call any
-number of times, from anywhere.
+number of times, from anywhere. The prebuilt action requires a signed-in user
+and only returns the payment when it belongs to that user; for anyone else it
+returns the bare outcome code. Wompi lets a payer retry a declined Web
+Checkout attempt under the same reference: a later `APPROVED` transaction
+supersedes the declined one (`supersededTransactionIds` keeps the history).
 
 ## Subscriptions
 
@@ -158,9 +166,8 @@ Tokenize in the browser (public key, PCI-friendly), subscribe in one action:
 ```tsx
 import { useWompiTokenizer } from "@pulgueta/wompi-convex/react";
 
-const { tokenizeCard, acceptancePermalink, ready } = useWompiTokenizer(
-  api.wompi.getConfig,
-);
+const { tokenizeCard, acceptancePermalink, personalDataAuthPermalink, ready } =
+  useWompiTokenizer(api.wompi.getConfig);
 const subscribe = useAction(api.wompi.subscribe);
 
 const onSubmit = async (card) => {
@@ -173,11 +180,16 @@ const onSubmit = async (card) => {
 };
 ```
 
-`subscribe` creates the Wompi payment source (with a fresh merchant acceptance
-token), inserts the subscription, and charges the first period — polling
-briefly so the common sandbox/production case resolves before the action
-returns. Trials skip the initial charge and convert automatically when they
-end.
+`subscribe` creates the Wompi payment source, inserts the subscription, and
+charges the first period — polling briefly so the common sandbox/production
+case resolves before the action returns. Trials skip the initial charge and
+convert automatically when they end. Wompi requires two acceptance tokens on
+every payment source and transaction (terms of use and personal-data
+authorization); `subscribe` fetches both from the merchant and sends them, so
+show the user both `acceptancePermalink` and `personalDataAuthPermalink` next
+to the card form. Calling `subscribe` twice while the first charge is in
+flight (double submit, action retry) reuses the same pending payment and
+reference — it never mints a second charge.
 
 Subscription state is a reactive query:
 
@@ -211,14 +223,23 @@ Wompi has no subscription engine, so the component is one:
 3. Charges run against the saved payment source
    (`payment_source_id` + `payment_method.installments`). Results — from the
    charge response, a webhook, or redirect confirmation — all flow through one
-   idempotent `applyTransaction` state machine.
+   idempotent `applyTransaction` state machine. A charge whose response never
+   arrives (timeout, 5xx, network) is left pending rather than marked failed:
+   the next claim reuses the same reference, Wompi rejects the duplicate, and
+   the existing transaction is reconciled — never a second charge. Only a
+   request Wompi actually rejected (validation, not found, other 4xx except
+   408 and 429) finalizes an attempt as `error`.
 4. Failed renewals walk a dunning ladder (default retries at +1d, +2d, +4d;
    `past_due` keeps access as grace). Exhausted dunning marks the subscription
    `unpaid` (or `canceled`, your choice). Price snapshots are taken at
    subscribe time; catalog price changes only affect new subscribers. Plan
    changes apply at the next renewal, without proration.
 5. The same cron sweeps stale pending payments: ones with a transaction id are
-   reconciled against the API; abandoned checkouts expire after ~26h.
+   reconciled against the API; ones without are looked up by reference
+   (server-side charges every run, checkouts once before expiring) so a
+   payment that reached Wompi without a webhook is still recorded; abandoned
+   checkouts expire after ~26h. A late `APPROVED` still reopens an expired or
+   declined row.
 
 Defaults are tunable:
 
@@ -239,8 +260,19 @@ new Wompi(components.wompi, {
 });
 ```
 
-Callbacks fire exactly once per state change, whether the change arrived via
-webhook, cron, or confirmation.
+Callbacks fire once per state change, whether the change arrived via webhook,
+cron, or confirmation: redeliveries and repeated confirmations are no-ops.
+Payment callbacks run after the component state commits, so a crash between
+the two can skip a callback (at-most-once) — a webhook retry reprocesses the
+delivery when the state was not applied, but not when only the callback was
+lost. Reconcile from `payments`/`subscriptions` if your side effects must be
+exact.
+
+`registerRoutes(http, { onEvent })` is different: it runs for every verified
+delivery that was not already applied. Two deliveries of the same event that
+overlap before the first outcome is stored, or a redelivery after a crash
+mid-apply, both reach `onEvent` — make it idempotent (key on
+`event.signature.checksum` or the transaction id).
 
 ## Dispersions (Pagos a Terceros)
 
@@ -370,7 +402,10 @@ back and Wompi's retry can safely replay it; completed redeliveries are no-ops.
   row, so a transaction crafted against your public key with a reused
   reference and a 1-cent amount grants nothing.
 - Component functions are only callable from your server functions; everything
-  in `api()` resolves identity through `getUserInfo`, never from client args.
+  in `api()` that touches user data resolves identity through `getUserInfo`,
+  never from client args. `checkout` only accepts a catalog `productKey`
+  (amounts and metadata are never client-supplied), and `confirmTransaction`
+  redacts payments that belong to another user.
 
 ## Tables
 
@@ -378,7 +413,7 @@ back and Wompi's retry can safely replay it; completed redeliveries are no-ops.
 | --- | --- |
 | `customers` | Your users in the billing domain (`userId` ↔ email). |
 | `products` | The catalog you define (`one_time` or `subscription` with interval/trial). |
-| `paymentSources` | Saved Wompi payment sources (brand/last four for display). |
+| `paymentSources` | Saved Wompi payment sources (brand/last four for display, `termsAcceptedAt`). |
 | `subscriptions` | The state machine: status, period, `nextChargeAt`, dunning counters. |
 | `payments` | One row per charge attempt, keyed by unique Wompi reference. |
 | `dispersions` | Payout batches (Pagos a Terceros), keyed by Wompi payout id. |

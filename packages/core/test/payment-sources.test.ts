@@ -57,6 +57,29 @@ describe("PaymentSources", () => {
       expect(error).toBeInstanceOf(WompiError);
       expect(error!.message).toContain("Private key is required");
     });
+
+    it("should accept a type and status outside the known enums", async () => {
+      const sources = makeClient(PRIVATE_KEY);
+
+      mockFetch.mockResolvedValueOnce(
+        okJson({
+          data: {
+            id: 543,
+            type: "FUTURE_SOURCE_TYPE",
+            status: "FUTURE_STATUS",
+            customer_email: "juan@example.com",
+            public_data: { type: "FUTURE_SOURCE_TYPE", phone_number: "3991111111" },
+          },
+        })
+      );
+
+      const [error, data] = await sources.getPaymentSource(543);
+
+      expect(error).toBeNull();
+      expect(data!.type).toBe("FUTURE_SOURCE_TYPE");
+      expect(data!.status).toBe("FUTURE_STATUS");
+      expect(data!.public_data!.type).toBe("FUTURE_SOURCE_TYPE");
+    });
   });
 
   describe("createPaymentSource", () => {
@@ -66,6 +89,7 @@ describe("PaymentSources", () => {
         type: "CARD",
         token: "tok_test_abc",
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         customer_email: "test@example.com",
       };
 
@@ -100,12 +124,74 @@ describe("PaymentSources", () => {
         type: "NEQUI",
         token: "nequi_test_abc",
         acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
         customer_email: "test@example.com",
       });
 
       expect(data).toBeNull();
       expect(error).toBeInstanceOf(WompiError);
       expect(error!.message).toContain("Private key is required");
+    });
+
+    it("should reject a missing accept_personal_auth before any request is sent", async () => {
+      const sources = makeClient(PRIVATE_KEY);
+
+      const [error, data] = await sources.createPaymentSource({
+        type: "CARD",
+        token: "tok_test_abc",
+        acceptance_token: "eyJhb...",
+        customer_email: "test@example.com",
+      });
+
+      expect(data).toBeNull();
+      expect(error).toBeInstanceOf(WompiError);
+      expect(error!.message).toContain("accept_personal_auth");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("should forward the second acceptance token and payment_description", async () => {
+      const sources = makeClient(PRIVATE_KEY);
+
+      mockFetch.mockResolvedValueOnce(
+        okJson({ data: { id: 999, type: "CARD", status: "AVAILABLE" } })
+      );
+
+      const [error] = await sources.createPaymentSource({
+        type: "CARD",
+        token: "tok_test_abc",
+        acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
+        customer_email: "test@example.com",
+        payment_description: "Suscripcion mensual",
+      });
+
+      expect(error).toBeNull();
+
+      const [, options] = mockFetch.mock.calls[0]!;
+      expect(JSON.parse(options.body)).toMatchObject({
+        acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
+        payment_description: "Suscripcion mensual",
+      });
+    });
+
+    it("should accept BANCOLOMBIA_TRANSFER as a source type", async () => {
+      const sources = makeClient(PRIVATE_KEY);
+
+      mockFetch.mockResolvedValueOnce(
+        okJson({ data: { id: 1001, type: "BANCOLOMBIA_TRANSFER", status: "PENDING" } })
+      );
+
+      const [error, data] = await sources.createPaymentSource({
+        type: "BANCOLOMBIA_TRANSFER",
+        token: "tok_bancolombia_abc",
+        acceptance_token: "eyJhb...",
+        accept_personal_auth: "eyJwZXJz...",
+        customer_email: "test@example.com",
+      });
+
+      expect(error).toBeNull();
+      expect(data!.type).toBe("BANCOLOMBIA_TRANSFER");
     });
 
     it("should return [error, null] on invalid input", async () => {

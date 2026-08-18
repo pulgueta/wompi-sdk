@@ -120,6 +120,117 @@ describe("checkout payments", () => {
     expect(result.payment?.status).toBe("pending");
   });
 
+  test("a payer retry approves a declined checkout under the same reference", async () => {
+    const t = initConvexTest();
+    const { customer } = await seed(t);
+
+    await t.mutation(api.payments.createCheckout, {
+      reference: "wmpk_retry",
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "sticker-pack",
+    });
+
+    // Web Checkout "reintento de pago": the first attempt is declined, the
+    // payer retries within minutes and Wompi creates a second transaction
+    // that shares the reference. Both arrive by webhook.
+    const declined = await t.mutation(api.billing.applyTransaction, {
+      reference: "wmpk_retry",
+      wompiTransactionId: "tx_declined",
+      wompiStatus: "DECLINED",
+      amountInCents: 500_000,
+      currency: "COP",
+      statusMessage: "Fondos insuficientes",
+      config: CONFIG,
+    });
+    expect(declined.outcome).toBe("applied");
+    expect(declined.payment?.status).toBe("declined");
+    expect(declined.payment?.failureReason).toBe("Fondos insuficientes");
+
+    const approved = await t.mutation(api.billing.applyTransaction, {
+      reference: "wmpk_retry",
+      wompiTransactionId: "tx_approved",
+      wompiStatus: "APPROVED",
+      amountInCents: 500_000,
+      currency: "COP",
+      paymentMethodType: "CARD",
+      config: CONFIG,
+    });
+
+    expect(approved.outcome).toBe("applied");
+    expect(approved.paymentChanged).toBe(true);
+    expect(approved.payment?.status).toBe("approved");
+    expect(approved.payment?.wompiTransactionId).toBe("tx_approved");
+    expect(approved.payment?.supersededTransactionIds).toEqual(["tx_declined"]);
+    expect(approved.payment?.failureReason).toBeUndefined();
+
+    // Redelivery of either transaction is a no-op afterwards.
+    const late = await t.mutation(api.billing.applyTransaction, {
+      reference: "wmpk_retry",
+      wompiTransactionId: "tx_declined",
+      wompiStatus: "DECLINED",
+      amountInCents: 500_000,
+      currency: "COP",
+      config: CONFIG,
+    });
+    expect(late.outcome).toBe("noop");
+    expect(late.payment?.status).toBe("approved");
+    expect(late.payment?.wompiTransactionId).toBe("tx_approved");
+  });
+
+  test("a late approval reopens an expired checkout, and a void closes an approved one", async () => {
+    const t = initConvexTest();
+    const { customer } = await seed(t);
+
+    const payment = await t.mutation(api.payments.createCheckout, {
+      reference: "wmpk_late",
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "sticker-pack",
+    });
+
+    const expired = await t.mutation(api.billing.recordChargeResult, {
+      paymentId: payment._id,
+      nextStatus: "expired",
+      failureReason: "Expired without a transaction",
+      config: CONFIG,
+    });
+    expect(expired.payment?.status).toBe("expired");
+
+    const approved = await t.mutation(api.billing.applyTransaction, {
+      reference: "wmpk_late",
+      wompiTransactionId: "tx_late",
+      wompiStatus: "APPROVED",
+      amountInCents: 500_000,
+      currency: "COP",
+      config: CONFIG,
+    });
+    expect(approved.outcome).toBe("applied");
+    expect(approved.payment?.status).toBe("approved");
+
+    const voided = await t.mutation(api.billing.applyTransaction, {
+      reference: "wmpk_late",
+      wompiTransactionId: "tx_late",
+      wompiStatus: "VOIDED",
+      amountInCents: 500_000,
+      currency: "COP",
+      config: CONFIG,
+    });
+    expect(voided.outcome).toBe("applied");
+    expect(voided.payment?.status).toBe("voided");
+
+    // Nothing moves a voided payment again.
+    const again = await t.mutation(api.billing.applyTransaction, {
+      reference: "wmpk_late",
+      wompiTransactionId: "tx_late",
+      wompiStatus: "APPROVED",
+      amountInCents: 500_000,
+      currency: "COP",
+      config: CONFIG,
+    });
+    expect(again.outcome).toBe("noop");
+  });
+
   test("ignores references it does not own", async () => {
     const t = initConvexTest();
     await seed(t);
@@ -466,6 +577,109 @@ describe("subscription lifecycle", () => {
     });
     expect(retriedAgain.payment!._id).toBe(retried.payment!._id);
     expect(retriedAgain.payment!.reference).toBe(retried.payment!.reference);
+
+    // The resume charge is declined as well: the next resume mints a new
+    // reference instead of reusing the settled one.
+    await t.mutation(api.billing.recordChargeResult, {
+      paymentId: retried.payment!._id,
+      nextStatus: "declined",
+      failureReason: "Card declined",
+      config: CONFIG,
+    });
+    const third = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: CARD,
+    });
+    expect(third.payment!._id).not.toBe(retried.payment!._id);
+    expect(third.payment!.attempt).toBe(2);
+    expect(third.payment!.reference).toBe(`wmps_${created.subscription._id}_resume_a2`);
+    expect(third.subscription.resumeAttempts).toBe(2);
+  });
+
+  test("resume numbering skips references held by rows from before the counter", async () => {
+    const t = initConvexTest();
+    const { customer } = await seed(t);
+
+    const created = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: CARD,
+    });
+    await t.mutation(api.billing.recordChargeResult, {
+      paymentId: created.payment!._id,
+      nextStatus: "declined",
+      failureReason: "Card declined",
+      config: CONFIG,
+    });
+
+    // A subscription resumed by an earlier release: the row exists, the
+    // counter does not.
+    const legacyReference = `wmps_${created.subscription._id}_resume_a1`;
+    const { _id: _legacyId, _creationTime: _legacyCreated, ...legacyRow } = created.payment!;
+    await t.run(async (ctx) => {
+      await ctx.db.insert("payments", {
+        ...legacyRow,
+        reference: legacyReference,
+        status: "declined",
+        attempt: 1,
+      });
+    });
+
+    const retried = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: CARD,
+    });
+    expect(retried.payment!.reference).toBe(`wmps_${created.subscription._id}_resume_a2`);
+    expect(retried.subscription.resumeAttempts).toBe(2);
+  });
+
+  test("subscribing twice while the initial charge is in flight reuses the pending payment", async () => {
+    const t = initConvexTest();
+    const { customer } = await seed(t);
+
+    const first = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: CARD,
+    });
+    expect(first.subscription.status).toBe("incomplete");
+    expect(first.payment!.reference).toBe(`wmps_${first.subscription._id}_init_a0`);
+
+    // Double submit / retried action before the first charge settled: the
+    // same pending row (and Wompi reference) comes back — never a second one.
+    const second = await t.mutation(api.subscriptions.create, {
+      customerId: customer._id,
+      userId: "user_1",
+      productKey: "pro-monthly",
+      paymentSource: { ...CARD, wompiSourceId: 5678 },
+    });
+    expect(second.subscription._id).toBe(first.subscription._id);
+    expect(second.payment!._id).toBe(first.payment!._id);
+    expect(second.payment!.reference).toBe(first.payment!.reference);
+    expect(second.payment!.amountInCents).toBe(first.payment!.amountInCents);
+
+    const pending = await t.run(async (ctx) =>
+      (
+        await ctx.db
+          .query("payments")
+          .withIndex("by_subscription_id", (q) => q.eq("subscriptionId", first.subscription._id))
+          .collect()
+      ).filter((p) => p.status === "pending"),
+    );
+    expect(pending).toHaveLength(1);
+
+    // The newest payment source becomes the one renewals charge.
+    const source = await t.run(async (ctx) =>
+      ctx.db.get("paymentSources", second.subscription.paymentSourceId),
+    );
+    expect(source?.wompiSourceId).toBe(5678);
+    expect(source?.termsAcceptedAt).toBeTypeOf("number");
   });
 
   test("scheduled plan change applies at the next renewal claim", async () => {

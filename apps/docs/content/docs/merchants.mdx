@@ -5,7 +5,7 @@ sidebar:
   label: Merchants
 ---
 
-The merchant endpoint is the only one that needs no authentication header — the public key travels as part of the URL. Use it to fetch merchant metadata and, crucially, the presigned acceptance token you must include in every `createTransaction` call.
+The merchant endpoint is the only one that needs no authentication header — the public key travels as part of the URL. Use it to fetch merchant metadata and, crucially, the two presigned acceptance tokens you must include in every `createTransaction` call.
 
 ## getMerchant()
 
@@ -21,43 +21,53 @@ merchant.name; // string | undefined
 merchant.legal_name; // string | undefined
 merchant.accepted_payment_methods; // string[] | undefined
 merchant.presigned_acceptance?.acceptance_token; // string
+merchant.presigned_personal_data_auth?.acceptance_token; // string
 ```
 
 ## Response shape
 
-| Field                        | Type        | Notes                           |
-| ---------------------------- | ----------- | ------------------------------- |
-| `id`                         | `number`    | Wompi merchant id.              |
-| `name`                       | `string?`   | Public merchant name.           |
-| `legal_name`                 | `string?`   | Legal entity name.              |
-| `legal_id` / `legal_id_type` | `string?`   | `NIT` or `CC`.                  |
-| `accepted_payment_methods`   | `string[]?` | `"CARD"`, `"NEQUI"`, `"PSE"`, … |
-| `accepted_currencies`        | `"COP"[]?`  | Always `["COP"]` today.         |
-| `presigned_acceptance`       | `object?`   | See below.                      |
+| Field                          | Type        | Notes                           |
+| ------------------------------ | ----------- | ------------------------------- |
+| `id`                           | `number`    | Wompi merchant id.              |
+| `name`                         | `string?`   | Public merchant name.           |
+| `legal_name`                   | `string?`   | Legal entity name.              |
+| `legal_id` / `legal_id_type`   | `string?`   | `NIT` or `CC`.                  |
+| `accepted_payment_methods`     | `string[]?` | `"CARD"`, `"NEQUI"`, `"PSE"`, … |
+| `accepted_currencies`          | `"COP"[]?`  | Always `["COP"]` today.         |
+| `presigned_acceptance`         | `object?`   | See below.                      |
+| `presigned_personal_data_auth` | `object?`   | See below.                      |
 
 ## Presigned acceptance
 
-The `presigned_acceptance` object proves the customer accepted the merchant's end-user policy. Show `permalink` to the customer; pass `acceptance_token` when you create a transaction.
+Wompi asks the customer for two consents, and both objects have the same shape — `&#123; acceptance_token, permalink, type &#125;`:
+
+- `presigned_acceptance` — the merchant's end-user policy. `type` is `"END_USER_POLICY"`. Send it as `acceptance_token`.
+- `presigned_personal_data_auth` — the personal-data authorization. `type` is `"PERSONAL_DATA_AUTH"`. Send it as `accept_personal_auth`.
+
+Show both `permalink` values to the customer; pass both tokens to `createTransaction` and `createPaymentSource`.
 
 ```ts
 const [error, response] = await wompi.merchants.getMerchant();
 if (error) throw error;
 
 const acceptance = response.presigned_acceptance;
+const personalDataAuth = response.presigned_personal_data_auth;
 
 // Persist for the duration of a single transaction — Wompi rotates these.
 return {
-  token: acceptance?.acceptance_token,
+  acceptanceToken: acceptance?.acceptance_token,
   termsUrl: acceptance?.permalink,
+  personalAuthToken: personalDataAuth?.acceptance_token,
+  personalDataUrl: personalDataAuth?.permalink,
 };
 ```
 
 - `acceptance_token` — string, expires; fetch once per transaction.
-- `permalink` — URL to the merchant's terms.
-- `type` — always `"END_USER_POLICY"`.
+- `permalink` — URL to the merchant's terms or personal-data policy.
+- `type` — `"END_USER_POLICY"` or `"PERSONAL_DATA_AUTH"`.
 
 :::tip[Cache, but only briefly]
-The acceptance token is short-lived. Refetch it for every transaction rather than caching it
+Both tokens are short-lived. Refetch them for every transaction rather than caching them
 across requests — the request is fast and cheap, and a stale token is a guaranteed
 `INPUT_VALIDATION_ERROR`.
 :::
