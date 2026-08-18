@@ -30,10 +30,11 @@ const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw merchantError;
 
 const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
-if (!acceptanceToken) throw new Error("Merchant has no acceptance token");
-
 const personalAuthToken =
   merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) {
+  throw new Error("Merchant has no acceptance tokens");
+}
 ```
 
 ## 3. Tokenize the card

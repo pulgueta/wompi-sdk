@@ -31,12 +31,16 @@ if (tokenError) throw tokenError;
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw merchantError;
 
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error("Merchant has no acceptance tokens");
+
 // 3. Convert the card token into a long-lived payment source.
 const [error, response] = await wompi.paymentSources.createPaymentSource({
   type: "CARD",
   token: token.id,
-  acceptance_token: merchant.presigned_acceptance!.acceptance_token,
-  accept_personal_auth: merchant.presigned_personal_data_auth!.acceptance_token,
+  acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   customer_email: "buyer@example.com",
   payment_description: "Suscripcion mensual",
 });
@@ -52,7 +56,7 @@ response.id; // numeric id — store this against your user
 | `type`                 | `string`  | `"CARD"`, `"NEQUI"`, `"DAVIPLATA"` or `"BANCOLOMBIA_TRANSFER"`.                      |
 | `token`                | `string`  | Output of `tokens.tokenizeCard` / `tokenizeNequi`.                                   |
 | `acceptance_token`     | `string`  | `merchant.presigned_acceptance.acceptance_token`.                                    |
-| `accept_personal_auth` | `string?` | `merchant.presigned_personal_data_auth.acceptance_token` — the second consent.       |
+| `accept_personal_auth` | `string`  | `merchant.presigned_personal_data_auth.acceptance_token` — the second consent.       |
 | `customer_email`       | `email`   | The customer this source belongs to.                                                 |
 | `payment_description`  | `string?` | Text the customer sees when they approve the source, e.g. in the Nequi push message. |
 

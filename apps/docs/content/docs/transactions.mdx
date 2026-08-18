@@ -25,9 +25,13 @@ Create a new transaction. You must include at least one of `payment_method` or `
 const [merchantError, merchant] = await wompi.merchants.getMerchant();
 if (merchantError) throw merchantError;
 
+const acceptanceToken = merchant.presigned_acceptance?.acceptance_token;
+const personalAuthToken = merchant.presigned_personal_data_auth?.acceptance_token;
+if (!acceptanceToken || !personalAuthToken) throw new Error("Merchant has no acceptance tokens");
+
 const [error, response] = await wompi.transactions.createTransaction({
-  acceptance_token: merchant.presigned_acceptance!.acceptance_token,
-  accept_personal_auth: merchant.presigned_personal_data_auth!.acceptance_token,
+  acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   amount_in_cents: 2_490_000,
   currency: "COP",
   signature,
@@ -56,7 +60,7 @@ permalinks before you charge.
 | Field                   | Type       | Notes                                                                                                        |
 | ----------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
 | `acceptance_token`      | `string`   | `merchant.presigned_acceptance.acceptance_token`.                                                            |
-| `accept_personal_auth`  | `string?`  | `merchant.presigned_personal_data_auth.acceptance_token`.                                                    |
+| `accept_personal_auth`  | `string`   | `merchant.presigned_personal_data_auth.acceptance_token`.                                                    |
 | `amount_in_cents`       | `integer`  | 1 – 1 000 000 000 000.                                                                                       |
 | `currency`              | `"COP"`    | Only value Wompi accepts.                                                                                    |
 | `signature`             | `string`   | SHA-256 hex digest.                                                                                          |
@@ -80,9 +84,10 @@ Any other field Wompi documents also reaches the API — the SDK does not strip 
 
 ```ts
 // Re-charge a stored payment source — no card token, no signature handshake.
+// `acceptanceToken` / `personalAuthToken` come from the merchant, as above.
 const [error, response] = await wompi.transactions.createTransaction({
-  acceptance_token: merchant.presigned_acceptance!.acceptance_token,
-  accept_personal_auth: merchant.presigned_personal_data_auth!.acceptance_token,
+  acceptance_token: acceptanceToken,
+  accept_personal_auth: personalAuthToken,
   amount_in_cents: 1_990_000,
   currency: "COP",
   signature,
