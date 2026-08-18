@@ -1,3 +1,22 @@
+## 3.3.0
+
+### Minor Changes
+
+- [#43](https://github.com/pulgueta/wompi-node/pull/43) [`2b7012c`](https://github.com/pulgueta/wompi-node/commit/2b7012c81dcbf2ef2f89bda8edd078126b39fee8) Thanks [@pulgueta](https://github.com/pulgueta)! - Support Wompi's second acceptance token: `accept_personal_auth` on
+  `createTransaction` / `createPaymentSource`, and `presigned_personal_data_auth`
+  on the merchant response. Both tokens are now **required** on those two
+  inputs — a request without `accept_personal_auth` is rejected locally with
+  `Invalid input` before anything is sent, matching Wompi's contract. Read the
+  token from `merchant.presigned_personal_data_auth.acceptance_token` and show
+  its `permalink` next to the terms link. Input schemas no longer strip documented fields —
+  `taxes`, `ip`, `recurrent`, `parent_transaction_id` and `payment_description`
+  now reach the API. Payment-source `type` and `status` widened for `DAVIPLATA`,
+  `BANCOLOMBIA_TRANSFER` and `VOIDED`.
+
+### Patch Changes
+
+- [#33](https://github.com/pulgueta/wompi-node/pull/33) [`4bd636e`](https://github.com/pulgueta/wompi-node/commit/4bd636e141155490fb37ef684ec8394f8038c983) Thanks [@pulgueta](https://github.com/pulgueta)! - Accept payout accounts whose balance is `null` in live API responses.
+
 ## 3.2.0
 
 ### Minor Changes
